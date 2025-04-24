@@ -34,13 +34,13 @@
 
 ### Вариант 1: Установщик
 
-1. Скачайте [установщик](https://github.com/John-LapTev/JL-Monitor-Brightness/releases/latest/download/JL_MonitorBrightness_Setup.exe)
+1. Скачайте [установщик](https://github.com/John-LapTev/JL-Monitor-Brightness/releases/download/v1.0.0/JL_MonitorBrightness_1.0.0_Setup.exe)
 2. Запустите скачанный файл и следуйте инструкциям установщика
 3. После установки программа будет доступна в меню «Пуск» и на рабочем столе (если выбрана соответствующая опция)
 
 ### Вариант 2: Портативная версия
 
-1. Скачайте [портативную версию](https://github.com/John-LapTev/JL-Monitor-Brightness/releases/latest/download/JL_MonitorBrightness_Portable.exe)
+1. Скачайте [портативную версию](https://github.com/John-LapTev/JL-Monitor-Brightness/releases/download/v1.0.0/JL_MonitorBrightness_1.0.0_Portable.exe)
 2. Распакуйте архив в любую папку
 3. Запустите `JL_MonitorBrightness_Portable.exe`
 4. Настройки будут сохраняться в той же папке, что удобно для использования на USB-накопителе

@@ -41,6 +41,7 @@ namespace JL_Monitor_Brightness
             
             // Обработчики событий
             this.MouseEnter += BrightnessOverlay_MouseEnter;
+            this.MouseMove += BrightnessOverlay_MouseMove;
             this.MouseLeave += BrightnessOverlay_MouseLeave;
             this.Loaded += BrightnessOverlay_Loaded;
             this.KeyDown += BrightnessOverlay_KeyDown;
@@ -71,9 +72,23 @@ namespace JL_Monitor_Brightness
             StartHideTimer();
         }
 
+        /// <summary>
+        /// ⛔ Раньше наведение мыши ОСТАНАВЛИВАЛО таймер, и шторка висела вечно:
+        /// подвинул ползунок мышью, курсор остался над пилюлей — убрать её уже
+        /// нечем (окно не активируется, клавиши до него не доходят). Замечено при
+        /// проверке 25.08.2026.
+        ///
+        /// Теперь отсчёт идёт от последнего ДЕЙСТВИЯ, а не от положения курсора:
+        /// пока крутишь — не гаснет, перестал — уходит сама.
+        /// </summary>
         private void BrightnessOverlay_MouseEnter(object sender, MouseEventArgs e)
         {
-            _hideTimer.Stop();
+            StartHideTimer();
+        }
+
+        private void BrightnessOverlay_MouseMove(object sender, MouseEventArgs e)
+        {
+            StartHideTimer();
         }
 
         private void BrightnessOverlay_MouseLeave(object sender, MouseEventArgs e)
@@ -145,8 +160,13 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        /// <summary>
+        /// Отсчёт всегда начинается заново: `Start()` на уже идущем таймере
+        /// ничего не сбрасывает, и шторка гасла бы по старому отсчёту.
+        /// </summary>
         private void StartHideTimer()
         {
+            _hideTimer.Stop();
             _hideTimer.Start();
         }
 
@@ -370,12 +390,7 @@ namespace JL_Monitor_Brightness
                 _writeTimer.Start();
             }
 
-            // Сбрасываем таймер скрытия
-            if (_hideTimer.IsEnabled)
-            {
-                _hideTimer.Stop();
-                _hideTimer.Start();
-            }
+            StartHideTimer();
         }
 
         /// <summary>
@@ -416,12 +431,7 @@ namespace JL_Monitor_Brightness
                 
                 UpdateBrightnessText(_currentMonitor.BrightnessPercentage);
                 
-                // Сбрасываем таймер скрытия
-                if (_hideTimer.IsEnabled)
-                {
-                    _hideTimer.Stop();
-                    _hideTimer.Start();
-                }
+                StartHideTimer();
             }
         }
 
@@ -438,12 +448,7 @@ namespace JL_Monitor_Brightness
                 
                 UpdateBrightnessText(_currentMonitor.BrightnessPercentage);
                 
-                // Сбрасываем таймер скрытия
-                if (_hideTimer.IsEnabled)
-                {
-                    _hideTimer.Stop();
-                    _hideTimer.Start();
-                }
+                StartHideTimer();
             }
         }
 

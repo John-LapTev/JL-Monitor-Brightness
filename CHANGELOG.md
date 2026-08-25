@@ -3,7 +3,7 @@
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация — [семантическая](https://semver.org/lang/ru/).
 
-## [1.1.0] — не выпущено
+## [1.1.0] — 2026-08-25
 
 Возвращение к проекту после года паузы. Поводом стал
 [issue #1](https://github.com/John-LapTev/JL-Monitor-Brightness/issues/1): человек

@@ -135,8 +135,10 @@
             </Grid>
 
             <!-- ── Вкладки ─────────────────────────────────────────────────── -->
-            <TabControl Grid.Row="1" Margin="24,0,24,0" Style="{StaticResource SegmentTabs}"
-                        ItemContainerStyle="{StaticResource SegmentTabItem}">
+            <TabControl x:Name="Tabs" Grid.Row="1" Margin="24,0,24,0"
+                        Style="{StaticResource SegmentTabs}"
+                        ItemContainerStyle="{StaticResource SegmentTabItem}"
+                        SelectionChanged="Tabs_SelectionChanged">
 
                 <!-- ═══ Общие ═══ -->
                 <TabItem Header="Общие">

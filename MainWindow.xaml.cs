@@ -185,6 +185,39 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        /// <summary>
+        /// Появление содержимого при смене вкладки.
+        ///
+        /// ⛔ Раньше это делал EventTrigger прямо в шаблоне TabControl — и приложение
+        /// не запускалось вовсе: Selector.SelectionChanged поднимает любой ComboBox
+        /// внутри вкладки, событие всплывает до TabControl, триггер ловит чужое и падает
+        /// с «Не удаётся найти имя Content». Здесь источник проверяется явно.
+        /// </summary>
+        private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Событие всплывает от вложенных списков — берём только своё.
+            if (!ReferenceEquals(e.OriginalSource, Tabs))
+            {
+                return;
+            }
+
+            if (Tabs.SelectedContent is not UIElement content)
+            {
+                return;
+            }
+
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1,
+                TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+                },
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+            };
+            content.BeginAnimation(OpacityProperty, fade);
+        }
+
         #region Окно без системной рамки
 
         /// <summary>

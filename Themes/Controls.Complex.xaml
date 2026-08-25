@@ -122,22 +122,16 @@
             </ContentPresenter>
           </Grid>
 
-          <ControlTemplate.Triggers>
-            <EventTrigger RoutedEvent="Selector.SelectionChanged">
-              <BeginStoryboard>
-                <Storyboard>
-                  <DoubleAnimation Storyboard.TargetName="Content" Storyboard.TargetProperty="Opacity"
-                                   From="0" To="1" Duration="0:0:0.20"/>
-                  <DoubleAnimation Storyboard.TargetName="ContentSlide" Storyboard.TargetProperty="Y"
-                                   From="8" To="0" Duration="0:0:0.24">
-                    <DoubleAnimation.EasingFunction>
-                      <CubicEase EasingMode="EaseOut"/>
-                    </DoubleAnimation.EasingFunction>
-                  </DoubleAnimation>
-                </Storyboard>
-              </BeginStoryboard>
-            </EventTrigger>
-          </ControlTemplate.Triggers>
+          <!--
+            ⛔ Здесь НЕЛЬЗЯ вешать EventTrigger на Selector.SelectionChanged.
+            Это маршрутизируемое событие: его поднимает любой ComboBox внутри вкладки,
+            оно всплывает до TabControl, триггер срабатывает на чужое событие и падает
+            с «Не удаётся найти имя Content» — потому что ищет цель не в той области имён.
+            Проверено на живой Windows 25.08.2026: приложение не запускалось вовсе.
+
+            Анимация смены вкладки живёт в TabItem (см. SegmentTabItem ниже) — там она
+            привязана к состоянию самого элемента и чужих событий не ловит.
+          -->
         </ControlTemplate>
       </Setter.Value>
     </Setter>
@@ -161,6 +155,14 @@
               <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
               <Setter Property="FontWeight" Value="SemiBold"/>
               <Setter TargetName="Bd" Property="Effect" Value="{StaticResource Shadow1}"/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="Opacity"
+                                     From="0.5" To="1" Duration="0:0:0.16"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
             </Trigger>
             <MultiTrigger>
               <MultiTrigger.Conditions>

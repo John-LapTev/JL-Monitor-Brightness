@@ -1,0 +1,207 @@
+<!--
+  Базовые контролы. Раньше все они были дефолтными Aero2: серые градиенты,
+  бордюры #707070, квадратные чекбоксы — язык Windows 7.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ── Кнопки ─────────────────────────────────────────────────────────── -->
+
+  <Style x:Key="GhostButton" TargetType="Button">
+    <Setter Property="Foreground" Value="{DynamicResource Ink2}"/>
+    <Setter Property="FontSize" Value="12.5"/>
+    <Setter Property="Padding" Value="12,7"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" CornerRadius="8" Background="Transparent"
+                  BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Hover}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Hairline}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="PrimaryButton" TargetType="Button">
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Padding" Value="18,9"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" CornerRadius="10"
+                  Background="{DynamicResource AccGradient}"
+                  Padding="{TemplateBinding Padding}"
+                  RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform><ScaleTransform x:Name="Sc"/></Border.RenderTransform>
+            <Border.Effect>
+              <DropShadowEffect Color="#7C82F4" BlurRadius="18" ShadowDepth="4"
+                                Direction="270" Opacity="0.38"/>
+            </Border.Effect>
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <!-- Нажатие чуть «продавливает» кнопку: 120 мс, короче — не заметно,
+                 длиннее — начинает ощущаться как задержка. -->
+            <EventTrigger RoutedEvent="Button.PreviewMouseLeftButtonDown">
+              <BeginStoryboard>
+                <Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX"
+                                   To="0.97" Duration="0:0:0.12"/>
+                  <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY"
+                                   To="0.97" Duration="0:0:0.12"/>
+                </Storyboard>
+              </BeginStoryboard>
+            </EventTrigger>
+            <EventTrigger RoutedEvent="Button.PreviewMouseLeftButtonUp">
+              <BeginStoryboard>
+                <Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX"
+                                   To="1" Duration="0:0:0.18"/>
+                  <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY"
+                                   To="1" Duration="0:0:0.18"/>
+                </Storyboard>
+              </BeginStoryboard>
+            </EventTrigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Круглая кнопка-крестик рядом с полем горячей клавиши.
+       Раньше это были три одинаковых серых прямоугольника «Очистить» в столбик. -->
+  <Style x:Key="ClearButton" TargetType="Button">
+    <Setter Property="Width" Value="26"/>
+    <Setter Property="Height" Value="26"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="ToolTip" Value="Очистить"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" CornerRadius="13" Background="Transparent">
+            <Path Data="M 0,0 L 8,8 M 8,0 L 0,8" Margin="9"
+                  Stroke="{DynamicResource Ink4}" StrokeThickness="1.5"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Hover}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ── Переключатель вместо квадратного чекбокса ───────────────────────── -->
+
+  <Style x:Key="Toggle" TargetType="CheckBox">
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <Grid Background="Transparent">
+            <Border x:Name="Track" Width="40" Height="24" CornerRadius="12"
+                    Background="{DynamicResource TrackBg}"
+                    HorizontalAlignment="Left"/>
+            <Border x:Name="Knob" Width="20" Height="20" CornerRadius="10"
+                    Background="White" HorizontalAlignment="Left"
+                    Margin="2,0,0,0" RenderTransformOrigin="0.5,0.5">
+              <Border.RenderTransform><TranslateTransform x:Name="Slide"/></Border.RenderTransform>
+              <Border.Effect>
+                <DropShadowEffect Color="#141626" BlurRadius="6" ShadowDepth="1"
+                                  Direction="270" Opacity="0.22"/>
+              </Border.Effect>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccGradient}"/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Slide" Storyboard.TargetProperty="X"
+                                     To="16" Duration="0:0:0.16">
+                      <DoubleAnimation.EasingFunction>
+                        <CubicEase EasingMode="EaseOut"/>
+                      </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Slide" Storyboard.TargetProperty="X"
+                                     To="0" Duration="0:0:0.16">
+                      <DoubleAnimation.EasingFunction>
+                        <CubicEase EasingMode="EaseOut"/>
+                      </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ── Поле горячей клавиши: выглядит как клавиша, а не как поле ввода ─── -->
+
+  <Style x:Key="HotkeyBox" TargetType="TextBox">
+    <Setter Property="IsReadOnly" Value="True"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FontSize" Value="12.5"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Bd" Height="30" CornerRadius="8"
+                  Background="{DynamicResource Bg}"
+                  BorderBrush="{DynamicResource Hairline}" BorderThickness="1">
+            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"
+                          HorizontalAlignment="Center" Margin="10,0"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <!-- В режиме записи поле подсвечивается акцентом: видно, что ждёт нажатия -->
+            <Trigger Property="IsFocused" Value="True">
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+              <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Card}"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HairlineStrong}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+</ResourceDictionary>

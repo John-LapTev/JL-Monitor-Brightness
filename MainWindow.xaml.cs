@@ -65,7 +65,7 @@ namespace JL_Monitor_Brightness
                 if (item.Tag.ToString() == _settings.ThemeColor)
                 {
                     ThemeColorComboBox.SelectedItem = item;
-                    ColorPreviewRectangle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_settings.ThemeColor));
+                    ColorPreviewRectangle.Fill = _settings.CreateThemeBrush();
                     break;
                 }
             }
@@ -184,6 +184,55 @@ namespace JL_Monitor_Brightness
                 MessageBox.Show($"Ошибка при обновлении автозапуска: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        #region Окно без системной рамки
+
+        /// <summary>
+        /// Появление окна: всплывает с лёгким увеличением за 0.22 с.
+        /// Кривая та же, что у регулятора — движение резко стартует и мягко доезжает.
+        /// </summary>
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            var spline = new System.Windows.Media.Animation.KeySpline(0.22, 1, 0.36, 1);
+
+            this.Opacity = 0;
+            var fade = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames();
+            fade.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(1,
+                System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), spline));
+            this.BeginAnimation(OpacityProperty, fade);
+
+            foreach (var prop in new[] { System.Windows.Media.ScaleTransform.ScaleXProperty,
+                                         System.Windows.Media.ScaleTransform.ScaleYProperty })
+            {
+                var scale = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames();
+                scale.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(1,
+                    System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(240)), spline));
+                WindowScale.BeginAnimation(prop, scale);
+            }
+        }
+
+        // WindowStyle=None убирает системную рамку — перетаскивание делаем сами.
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 1)
+            {
+                try { DragMove(); } catch { /* окно уже закрывается */ }
+            }
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void CloseWindow_Click(object sender, RoutedEventArgs e)
+        {
+            // Close(), а не CloseForReal(): при включённой галочке окно должно уйти
+            // в трей — крестик здесь ведёт себя как системный.
+            Close();
+        }
+
+        #endregion
 
         #region Event Handlers
         private void StartWithWindowsCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -423,8 +472,9 @@ namespace JL_Monitor_Brightness
         {
             if (_isInitializing) return;
             
-            int value = (int)e.NewValue;
-            TimeoutTextBlock.Text = $"{value} сек";
+            int ms = (int)e.NewValue;
+            // Слайдер задаёт миллисекунды, а человеку понятнее секунды с десятыми.
+            TimeoutTextBlock.Text = (ms / 1000.0).ToString("0.0", System.Globalization.CultureInfo.CurrentCulture) + " с";
         }
 
         private void ShowPercentageCheckBox_Changed(object sender, RoutedEventArgs e)

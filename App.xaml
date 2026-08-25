@@ -12,6 +12,8 @@
                 <ResourceDictionary Source="Themes/Effects.xaml"/>
                 <ResourceDictionary Source="Themes/Icons.xaml"/>
                 <ResourceDictionary Source="Themes/Controls.Slider.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.Basic.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.Complex.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

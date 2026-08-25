@@ -5,340 +5,378 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:JL_Monitor_Brightness"
         mc:Ignorable="d"
-        Title="JL Monitor Brightness - Настройки" 
-        Height="450" Width="600"
+        Title="JL Monitor Brightness"
+        Height="560" Width="560"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanMinimize"
-        Icon="/Resources/Icons/brightness.ico">
-    
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="{DynamicResource UiFont}"
+        Loaded="Window_Loaded">
+
     <Window.Resources>
-        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
+        <!-- Строка настройки: подпись слева, контрол справа, разделитель снизу.
+             Высота 44 вместо прежних ~28 — мелкий текст в тесной сетке читался хуже всего. -->
+        <Style x:Key="Row" TargetType="Grid">
+            <Setter Property="Height" Value="44"/>
+        </Style>
+
+        <Style x:Key="RowLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ink2}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="RowValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,10,0,5"/>
-        </Style>
-        
-        <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,5,10,5"/>
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
         </Style>
-        
-        <Style TargetType="CheckBox">
-            <Setter Property="Margin" Value="0,5,0,5"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+
+        <!-- Заголовок раздела: мелкий и приглушённый НАД карточкой.
+             Раньше был 16px SemiBold чёрным — читался как заголовок в текстовом редакторе. -->
+        <Style x:Key="GroupCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ink3}"/>
+            <Setter Property="Margin" Value="4,0,0,8"/>
         </Style>
-        
-        <Style TargetType="ComboBox">
-            <Setter Property="Margin" Value="0,5,0,5"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="MinWidth" Value="150"/>
+
+        <Style x:Key="CardPanel" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Card}"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,4,16,4"/>
+            <Setter Property="Effect" Value="{StaticResource Shadow1}"/>
+            <Setter Property="Margin" Value="0,0,0,18"/>
         </Style>
-        
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="15,5"/>
-            <Setter Property="Margin" Value="5"/>
+
+        <Style x:Key="Divider" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Hairline}"/>
         </Style>
     </Window.Resources>
-    
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        
-        <TabControl Grid.Row="0">
-            <TabItem Header="Общие">
-                <ScrollViewer>
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Основные настройки" Style="{StaticResource SectionHeaderStyle}"/>
-                        
-                        <CheckBox x:Name="StartWithWindowsCheckBox" 
-                                  Content="Запускать при старте Windows" 
-                                  Checked="StartWithWindowsCheckBox_Changed"
-                                  Unchecked="StartWithWindowsCheckBox_Changed"/>
-                        
-                        <CheckBox x:Name="MinimizeToTrayCheckBox" 
-                                  Content="Сворачивать в трей при закрытии"
-                                  Checked="MinimizeToTrayCheckBox_Changed"
-                                  Unchecked="MinimizeToTrayCheckBox_Changed"/>
-                        
-                        <TextBlock Text="Мониторы" Style="{StaticResource SectionHeaderStyle}"/>
-                        
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <TextBlock Text="Монитор по умолчанию:" 
-                                       Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <ComboBox x:Name="DefaultMonitorComboBox" 
-                                      Grid.Column="1"
-                                      SelectionChanged="DefaultMonitorComboBox_SelectionChanged"/>
-                        </Grid>
-                        
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <TextBlock Text="Шаг изменения яркости:" 
-                                       Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Slider x:Name="BrightnessStepSlider" 
-                                        Width="150"
-                                        Minimum="1" 
-                                        Maximum="20" 
-                                        Value="10"
-                                        TickFrequency="1"
-                                        IsSnapToTickEnabled="True"
-                                        ValueChanged="BrightnessStepSlider_ValueChanged"/>
-                                
-                                <TextBlock x:Name="BrightnessStepTextBlock" 
-                                           Text="10%" 
-                                           Margin="10,0,0,0" 
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
-                        
-                        <Button x:Name="RefreshMonitorsButton" 
-                                Content="Обновить список мониторов" 
-                                HorizontalAlignment="Left"
-                                Click="RefreshMonitorsButton_Click"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            
-            <TabItem Header="Горячие клавиши">
-                <ScrollViewer>
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Настройка горячих клавиш" Style="{StaticResource SectionHeaderStyle}"/>
-                        
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            
-                            <!-- Увеличение яркости -->
-                            <TextBlock Text="Увеличить яркость:" 
-                                       Grid.Row="0" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <TextBox x:Name="BrightnessUpHotkeyTextBox" 
-                                     Grid.Row="0" Grid.Column="1" 
-                                     IsReadOnly="True"
-                                     Margin="0,5,0,5"
-                                     KeyDown="HotkeyTextBox_KeyDown"
-                                     GotFocus="HotkeyTextBox_GotFocus"
-                                     LostFocus="HotkeyTextBox_LostFocus"/>
-                            
-                            <Button x:Name="ClearBrightnessUpButton" 
-                                    Content="Очистить" 
-                                    Grid.Row="0" Grid.Column="2"
-                                    Click="ClearHotkeyButton_Click"
-                                    Tag="BrightnessUp"/>
-                            
-                            <!-- Уменьшение яркости -->
-                            <TextBlock Text="Уменьшить яркость:" 
-                                       Grid.Row="1" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <TextBox x:Name="BrightnessDownHotkeyTextBox" 
-                                     Grid.Row="1" Grid.Column="1" 
-                                     IsReadOnly="True"
-                                     Margin="0,5,0,5"
-                                     KeyDown="HotkeyTextBox_KeyDown"
-                                     GotFocus="HotkeyTextBox_GotFocus"
-                                     LostFocus="HotkeyTextBox_LostFocus"/>
-                            
-                            <Button x:Name="ClearBrightnessDownButton" 
-                                    Content="Очистить" 
-                                    Grid.Row="1" Grid.Column="2"
-                                    Click="ClearHotkeyButton_Click"
-                                    Tag="BrightnessDown"/>
-                            
-                            <!-- Показать оверлей -->
-                            <TextBlock Text="Показать регулятор:" 
-                                       Grid.Row="2" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <TextBox x:Name="BrightnessOverlayHotkeyTextBox" 
-                                     Grid.Row="2" Grid.Column="1" 
-                                     IsReadOnly="True"
-                                     Margin="0,5,0,5"
-                                     KeyDown="HotkeyTextBox_KeyDown"
-                                     GotFocus="HotkeyTextBox_GotFocus"
-                                     LostFocus="HotkeyTextBox_LostFocus"/>
-                            
-                            <Button x:Name="ClearBrightnessOverlayButton" 
-                                    Content="Очистить" 
-                                    Grid.Row="2" Grid.Column="2"
-                                    Click="ClearHotkeyButton_Click"
-                                    Tag="BrightnessOverlay"/>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            
-            <TabItem Header="Внешний вид">
-                <ScrollViewer>
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Настройки интерфейса" Style="{StaticResource SectionHeaderStyle}"/>
-                        
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            
-                            <!-- Прозрачность -->
-                            <TextBlock Text="Прозрачность:" 
-                                       Grid.Row="0" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Slider x:Name="OpacitySlider" 
-                                        Width="150"
-                                        Minimum="0.3" 
-                                        Maximum="1" 
-                                        Value="0.9"
-                                        TickFrequency="0.1"
-                                        ValueChanged="OpacitySlider_ValueChanged"/>
-                                
-                                <TextBlock x:Name="OpacityTextBlock" 
-                                           Text="90%" 
-                                           Margin="10,0,0,0" 
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            
-                            <!-- Время отображения -->
-                            <TextBlock Text="Время отображения:" 
-                                       Grid.Row="1" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Slider x:Name="TimeoutSlider" 
-                                        Width="150"
-                                        Minimum="1" 
-                                        Maximum="10" 
-                                        Value="3"
-                                        TickFrequency="1"
-                                        IsSnapToTickEnabled="True"
-                                        ValueChanged="TimeoutSlider_ValueChanged"/>
-                                
-                                <TextBlock x:Name="TimeoutTextBlock" 
-                                           Text="3 сек" 
-                                           Margin="10,0,0,0" 
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            
-                            <!-- Отображение процентов -->
-                            <TextBlock Text="Отображение:" 
-                                       Grid.Row="2" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <CheckBox x:Name="ShowPercentageCheckBox" 
-                                      Content="Показывать проценты яркости"
-                                      Grid.Row="2" Grid.Column="1"
-                                      Checked="ShowPercentageCheckBox_Changed"
-                                      Unchecked="ShowPercentageCheckBox_Changed"/>
-                            
-                            <!-- Цветовая тема -->
-                            <TextBlock Text="Цветовая тема:" 
-                                       Grid.Row="3" Grid.Column="0" 
-                                       Style="{StaticResource SettingLabelStyle}"/>
-                            
-                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ComboBox x:Name="ThemeColorComboBox" 
-                                          Width="150"
-                                          SelectionChanged="ThemeColorComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Синий" Tag="#1E90FF"/>
-                                    <ComboBoxItem Content="Зеленый" Tag="#4CAF50"/>
-                                    <ComboBoxItem Content="Красный" Tag="#F44336"/>
-                                    <ComboBoxItem Content="Оранжевый" Tag="#FF9800"/>
-                                    <ComboBoxItem Content="Фиолетовый" Tag="#9C27B0"/>
-                                    <ComboBoxItem Content="Бирюзовый" Tag="#009688"/>
-                                </ComboBox>
-                                
-                                <Rectangle x:Name="ColorPreviewRectangle"
-                                           Width="24" 
-                                           Height="24" 
-                                           Margin="10,0,0,0"
-                                           Fill="#1E90FF"
-                                           RadiusX="4"
-                                           RadiusY="4"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            
-            <TabItem Header="О программе">
-                <ScrollViewer>
-                    <StackPanel Margin="10">
-                        <TextBlock Text="JL Monitor Brightness" 
-                                   FontSize="20" 
-                                   FontWeight="Bold" 
-                                   Margin="0,10,0,5"/>
-                        
-                        <TextBlock x:Name="VersionTextBlock" 
-                                   Text="Версия 1.0.0" 
-                                   Margin="0,0,0,5"/>
-                        
-                        <CheckBox x:Name="CheckForUpdatesCheckBox"
-                                  Content="Автоматически проверять обновления при запуске"
-                                  Margin="0,5,0,10"
-                                  Checked="CheckForUpdatesCheckBox_Changed"
-                                  Unchecked="CheckForUpdatesCheckBox_Changed"/>
-                        
-                        <Button x:Name="CheckForUpdatesButton"
-                                Content="Проверить обновления сейчас"
-                                Padding="10,5"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,10"
-                                Click="CheckForUpdatesButton_Click"/>
-                        
-                        <Rectangle Height="1" 
-                                   Fill="#DDDDDD" 
-                                   Margin="0,5,0,10"/>
-                        
-                        <TextBlock TextWrapping="Wrap">
-                            <Run Text="Утилита для управления яркостью внешних мониторов через горячие клавиши."/>
-                            <LineBreak/>
-                            <LineBreak/>
-                            <Run Text="© 2025 JL Monitor Brightness. Все права защищены."/>
-                        </TextBlock>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-        </TabControl>
-        
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="SaveButton" 
-                    Content="Сохранить" 
-                    Click="SaveButton_Click"/>
-            
-            <Button x:Name="CancelButton" 
-                    Content="Отмена" 
-                    Click="CancelButton_Click"/>
-        </StackPanel>
-    </Grid>
+
+    <!-- Скругление окна рисуем сами: WindowStyle=None убирает системную рамку -->
+    <Border CornerRadius="14" Background="{DynamicResource Bg}"
+            BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+            RenderTransformOrigin="0.5,0.5">
+        <Border.RenderTransform>
+            <ScaleTransform x:Name="WindowScale" ScaleX="0.98" ScaleY="0.98"/>
+        </Border.RenderTransform>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ── Свой заголовок окна ─────────────────────────────────────── -->
+            <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Path Grid.Column="0" Width="17" Height="17" Margin="18,0,0,0"
+                      Data="{StaticResource IconSun}"
+                      Stroke="{DynamicResource Ink2}" StrokeThickness="1.6"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Stretch="Uniform" VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="1" Text="Яркость" Margin="10,0,0,0"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="2" Width="40" Height="44" Click="Minimize_Click"
+                        Style="{StaticResource ClearButton}" ToolTip="Свернуть">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="Transparent">
+                                <Path Data="M 0,0 L 10,0" Stroke="{DynamicResource Ink2}"
+                                      StrokeThickness="1.2" VerticalAlignment="Center"
+                                      HorizontalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Hover}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button Grid.Column="3" Width="46" Height="44" Click="CloseWindow_Click" ToolTip="Закрыть">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="0,13,0,0">
+                                <Path Data="M 0,0 L 9,9 M 9,0 L 0,9" Stroke="{DynamicResource Ink2}"
+                                      StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#E5484D"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+
+            <!-- ── Вкладки ─────────────────────────────────────────────────── -->
+            <TabControl Grid.Row="1" Margin="24,0,24,0" Style="{StaticResource SegmentTabs}"
+                        ItemContainerStyle="{StaticResource SegmentTabItem}">
+
+                <!-- ═══ Общие ═══ -->
+                <TabItem Header="Общие">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Запуск" Style="{StaticResource GroupCaption}"/>
+                            <Border Style="{StaticResource CardPanel}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Запускать при старте Windows" Style="{StaticResource RowLabel}"/>
+                                        <CheckBox x:Name="StartWithWindowsCheckBox"
+                                                  Style="{StaticResource Toggle}"
+                                                  HorizontalAlignment="Right"
+                                                  Checked="StartWithWindowsCheckBox_Changed"
+                                                  Unchecked="StartWithWindowsCheckBox_Changed"/>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Сворачивать в трей при закрытии" Style="{StaticResource RowLabel}"/>
+                                        <CheckBox x:Name="MinimizeToTrayCheckBox"
+                                                  Style="{StaticResource Toggle}"
+                                                  HorizontalAlignment="Right"
+                                                  Checked="MinimizeToTrayCheckBox_Changed"
+                                                  Unchecked="MinimizeToTrayCheckBox_Changed"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="Мониторы" Style="{StaticResource GroupCaption}"/>
+                            <Border Style="{StaticResource CardPanel}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Монитор по умолчанию" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="DefaultMonitorComboBox"
+                                                  Style="{StaticResource HaloCombo}"
+                                                  Width="240" HorizontalAlignment="Right"
+                                                  SelectionChanged="DefaultMonitorComboBox_SelectionChanged"/>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Шаг изменения яркости" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Slider x:Name="BrightnessStepSlider" Width="160"
+                                                    Style="{StaticResource HaloSlider}"
+                                                    Minimum="1" Maximum="20" Value="10"
+                                                    TickFrequency="1" IsSnapToTickEnabled="True"
+                                                    VerticalAlignment="Center"
+                                                    ValueChanged="BrightnessStepSlider_ValueChanged"/>
+                                            <TextBlock x:Name="BrightnessStepTextBlock" Text="10%"
+                                                       Width="42" TextAlignment="Right" Margin="12,0,0,0"
+                                                       Style="{StaticResource RowValue}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Button x:Name="RefreshMonitorsButton"
+                                    Content="Обновить список мониторов"
+                                    Style="{StaticResource GhostButton}"
+                                    HorizontalAlignment="Left"
+                                    Click="RefreshMonitorsButton_Click"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ═══ Горячие клавиши ═══ -->
+                <TabItem Header="Клавиши">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Нажмите на поле и задайте комбинацию" Style="{StaticResource GroupCaption}"/>
+                            <Border Style="{StaticResource CardPanel}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Увеличить яркость" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBox x:Name="BrightnessUpHotkeyTextBox" Width="170"
+                                                     Style="{StaticResource HotkeyBox}"
+                                                     KeyDown="HotkeyTextBox_KeyDown"/>
+                                            <Button x:Name="ClearBrightnessUpButton" Margin="6,0,0,0"
+                                                    Style="{StaticResource ClearButton}"
+                                                    Click="ClearHotkeyButton_Click"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Уменьшить яркость" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBox x:Name="BrightnessDownHotkeyTextBox" Width="170"
+                                                     Style="{StaticResource HotkeyBox}"
+                                                     KeyDown="HotkeyTextBox_KeyDown"/>
+                                            <Button x:Name="ClearBrightnessDownButton" Margin="6,0,0,0"
+                                                    Style="{StaticResource ClearButton}"
+                                                    Click="ClearHotkeyButton_Click"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Показать регулятор" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBox x:Name="BrightnessOverlayHotkeyTextBox" Width="170"
+                                                     Style="{StaticResource HotkeyBox}"
+                                                     KeyDown="HotkeyTextBox_KeyDown"/>
+                                            <Button x:Name="ClearBrightnessOverlayButton" Margin="6,0,0,0"
+                                                    Style="{StaticResource ClearButton}"
+                                                    Click="ClearHotkeyButton_Click"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Ink4}"
+                                       Margin="4,0,4,0"
+                                       Text="Комбинация должна содержать хотя бы один модификатор: Ctrl, Alt, Shift или Win. Клавиши не сработают, если активное окно запущено от имени администратора."/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ═══ Внешний вид ═══ -->
+                <TabItem Header="Вид">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Регулятор яркости" Style="{StaticResource GroupCaption}"/>
+                            <Border Style="{StaticResource CardPanel}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Прозрачность" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Slider x:Name="OpacitySlider" Width="160"
+                                                    Style="{StaticResource HaloSlider}"
+                                                    Minimum="0.3" Maximum="1" Value="0.9"
+                                                    VerticalAlignment="Center"
+                                                    ValueChanged="OpacitySlider_ValueChanged"/>
+                                            <TextBlock x:Name="OpacityTextBlock" Text="90%"
+                                                       Width="42" TextAlignment="Right" Margin="12,0,0,0"
+                                                       Style="{StaticResource RowValue}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Время отображения" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Slider x:Name="TimeoutSlider" Width="160"
+                                                    Style="{StaticResource HaloSlider}"
+                                                    Minimum="800" Maximum="6000" Value="1400"
+                                                    TickFrequency="100" IsSnapToTickEnabled="True"
+                                                    VerticalAlignment="Center"
+                                                    ValueChanged="TimeoutSlider_ValueChanged"/>
+                                            <TextBlock x:Name="TimeoutTextBlock" Text="1,4 с"
+                                                       Width="42" TextAlignment="Right" Margin="12,0,0,0"
+                                                       Style="{StaticResource RowValue}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Показывать проценты" Style="{StaticResource RowLabel}"/>
+                                        <CheckBox x:Name="ShowPercentageCheckBox"
+                                                  Style="{StaticResource Toggle}"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Цвет акцента" Style="{StaticResource RowLabel}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Border x:Name="ColorPreviewBorder" Width="22" Height="22"
+                                                    CornerRadius="11" Margin="0,0,10,0"
+                                                    VerticalAlignment="Center"
+                                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1">
+                                                <Rectangle x:Name="ColorPreviewRectangle" RadiusX="10" RadiusY="10"/>
+                                            </Border>
+                                            <ComboBox x:Name="ThemeColorComboBox" Width="180"
+                                                      Style="{StaticResource HaloCombo}"
+                                                      SelectionChanged="ThemeColorComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="Лаванда" Tag="#7C82F4"/>
+                                                <ComboBoxItem Content="Небо" Tag="#5AA9E6"/>
+                                                <ComboBoxItem Content="Мята" Tag="#3FBF9F"/>
+                                                <ComboBoxItem Content="Песок" Tag="#E0A34A"/>
+                                                <ComboBoxItem Content="Коралл" Tag="#E0697A"/>
+                                                <ComboBoxItem Content="Графит" Tag="#6B6B75"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ═══ О программе ═══ -->
+                <TabItem Header="О программе">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <Border Style="{StaticResource CardPanel}" Padding="20">
+                                <StackPanel>
+                                    <TextBlock Text="JL Monitor Brightness"
+                                               FontSize="17" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Ink}"/>
+                                    <TextBlock x:Name="VersionTextBlock" Text="Версия 1.1.0"
+                                               FontSize="12.5" Foreground="{DynamicResource Ink4}"
+                                               Margin="0,4,0,0"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="13" LineHeight="20"
+                                               Foreground="{DynamicResource Ink2}" Margin="0,14,0,0"
+                                               Text="Яркость внешних мониторов с клавиатуры. Работает через DDC/CI — тот же канал, которым пользуется экранное меню самого монитора."/>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="Обновления" Style="{StaticResource GroupCaption}"/>
+                            <Border Style="{StaticResource CardPanel}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Проверять при запуске" Style="{StaticResource RowLabel}"/>
+                                        <CheckBox x:Name="CheckForUpdatesCheckBox"
+                                                  Style="{StaticResource Toggle}"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+                                    <Border Style="{StaticResource Divider}"/>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Проверить сейчас" Style="{StaticResource RowLabel}"/>
+                                        <Button x:Name="CheckForUpdatesButton" Content="Проверить"
+                                                Style="{StaticResource GhostButton}"
+                                                HorizontalAlignment="Right"
+                                                Click="CheckForUpdatesButton_Click"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+
+            <!-- ── Низ окна ────────────────────────────────────────────────── -->
+            <Grid Grid.Row="2" Margin="24,10,24,20">
+                <Button x:Name="CancelButton" Content="Отмена"
+                        Style="{StaticResource GhostButton}"
+                        HorizontalAlignment="Left"
+                        Click="CancelButton_Click"/>
+                <Button x:Name="SaveButton" Content="Сохранить"
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Right"
+                        Click="SaveButton_Click"/>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

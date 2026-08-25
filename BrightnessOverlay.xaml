@@ -65,11 +65,14 @@
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                       Stretch="Uniform" VerticalAlignment="Center"/>
 
+                <!-- Двойной клик возвращает 100%: то же движение, что и в настройках,
+                     где двойным кликом сбрасывается любой ползунок. -->
                 <Slider x:Name="BrightnessSlider"
                         Grid.Column="1"
                         Margin="12,0"
                         Minimum="0" Maximum="100" Value="50"
                         Style="{StaticResource HaloSlider}"
+                        MouseDoubleClick="BrightnessSlider_ResetToFull"
                         ValueChanged="BrightnessSlider_ValueChanged"/>
 
                 <!-- Ширина фиксирована и цифры табличные: иначе число прыгает

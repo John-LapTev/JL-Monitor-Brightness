@@ -371,6 +371,14 @@ namespace JL_Monitor_Brightness
         /// <summary>Монитор не принял яркость — вызывающий решает, как сообщить.</summary>
         public event EventHandler<PhysicalMonitorInfo> BrightnessFailed;
 
+        /// <summary>Двойной клик по ползунку — сразу полная яркость.</summary>
+        private void BrightnessSlider_ResetToFull(object sender, MouseButtonEventArgs e)
+        {
+            BrightnessSlider.Value = 100;
+            StartHideTimer();
+            e.Handled = true;
+        }
+
         private void BrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingSlider || _currentMonitor == null) return;

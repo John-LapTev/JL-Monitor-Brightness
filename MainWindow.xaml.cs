@@ -55,8 +55,13 @@ namespace JL_Monitor_Brightness
             OpacitySlider.Value = _settings.OverlayOpacity;
             OpacityTextBlock.Text = $"{Math.Round(_settings.OverlayOpacity * 100)}%";
             
-            TimeoutSlider.Value = _settings.OverlayTimeout / 1000;
-            TimeoutTextBlock.Text = $"{_settings.OverlayTimeout / 1000} сек";
+            // ⛔ Слайдер задаёт МИЛЛИСЕКУНДЫ (800…6000), а здесь стояло деление на 1000.
+            // При 1400 мс он получал «1», прижимался к минимуму 800 — и сохранение
+            // умножало это обратно на 1000, записывая 800 000 мс: тринадцать минут,
+            // из-за чего шторка переставала гаснуть. Замечено при проверке 25.08.2026.
+            TimeoutSlider.Value = _settings.OverlayTimeout;
+            TimeoutTextBlock.Text = (_settings.OverlayTimeout / 1000.0)
+                .ToString("0.0", System.Globalization.CultureInfo.CurrentCulture) + " с";
             
             ShowPercentageCheckBox.IsChecked = _settings.ShowPercentage;
             
@@ -145,7 +150,7 @@ namespace JL_Monitor_Brightness
             
             // Настройки интерфейса
             _settings.OverlayOpacity = OpacitySlider.Value;
-            _settings.OverlayTimeout = (int)(TimeoutSlider.Value * 1000);
+            _settings.OverlayTimeout = (int)TimeoutSlider.Value;
             _settings.ShowPercentage = ShowPercentageCheckBox.IsChecked ?? true;
             
             if (ThemeColorComboBox.SelectedItem != null)

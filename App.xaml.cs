@@ -381,6 +381,19 @@ namespace JL_Monitor_Brightness
             
             // Создаем новое окно настроек
             _mainWindow = new MainWindow(_monitorService, _hotkeyService, _settings);
+
+            // Сохранение применяется сразу, не дожидаясь закрытия окна: настройки
+            // правят пачкой и хотят видеть результат тут же.
+            _mainWindow.SettingsSaved += (s, e) =>
+            {
+                RegisterHotkeys();
+
+                // Акцент кладётся напрямую, а не только через оверлей: до первого
+                // вызова шторки оверлея ещё нет, и цвет не применился бы вовсе.
+                Resources["PrimaryBrush"] = _settings.CreateThemeBrush();
+                _brightnessOverlay?.ApplySettings();
+            };
+
             _mainWindow.Closed += (s, e) => 
             {
                 _mainWindow = null;

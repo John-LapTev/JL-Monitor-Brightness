@@ -125,6 +125,9 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        /// <summary>Настройки записаны на диск — самое время их применить.</summary>
+        public event EventHandler SettingsSaved;
+
         private void SaveSettings()
         {
             // Общие настройки
@@ -157,6 +160,13 @@ namespace JL_Monitor_Brightness
             if (_settings.SaveSettings())
             {
                 UpdateStartupRegistry();
+
+                // ⛔ Раньше настройки вступали в силу только при закрытии окна —
+                // App слушал Closed и IsVisibleChanged. Как только окно перестало
+                // закрываться после сохранения, применение пропало: цвет акцента
+                // сохранялся в файл, но на экране не менялся до перезапуска.
+                SettingsSaved?.Invoke(this, EventArgs.Empty);
+
                 ShowSaveToast("Сохранено", ok: true);
             }
             else

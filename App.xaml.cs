@@ -132,8 +132,7 @@ namespace JL_Monitor_Brightness
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка при запуске приложения: {ex.Message}\n\n{ex.StackTrace}", 
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowFatal(ex);
             }
         }
 
@@ -150,11 +149,61 @@ namespace JL_Monitor_Brightness
             _instanceMutex?.Dispose();
         }
 
+        /// <summary>
+        /// Показывает ошибку и — главное — ПИШЕТ ЕЁ В ФАЙЛ.
+        ///
+        /// Модальное окно легко пропустить: оно уходит за другие окна, а остаётся
+        /// только системный звук. Так и случилось при первой проверке 25.08.2026:
+        /// «звук ошибки есть, а окна нет». Без файла причину не узнать.
+        /// </summary>
         private static void ShowFatal(Exception ex)
         {
+            string текст = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                           $"{ex?.GetType().Name}: {ex?.Message}\n\n" +
+                           $"{ex?.StackTrace}\n" +
+                           (ex?.InnerException != null
+                               ? $"\nВнутренняя: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}\n"
+                               : "") +
+                           new string('-', 70) + "\n";
+
+            foreach (string путь in LogPaths())
+            {
+                try
+                {
+                    System.IO.File.AppendAllText(путь, текст, System.Text.Encoding.UTF8);
+                    break;
+                }
+                catch
+                {
+                    // папка может быть закрыта на запись — пробуем следующую
+                }
+            }
+
             MessageBox.Show(
-                $"Непредвиденная ошибка: {ex?.Message}\n\n{ex?.StackTrace}",
+                $"Непредвиденная ошибка: {ex?.Message}\n\n" +
+                "Подробности записаны в файл ошибки.log рядом с программой " +
+                "(или в папке %APPDATA%\\JL-Monitor-Brightness).",
                 "JL Monitor Brightness", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        /// <summary>Куда пробуем писать журнал ошибок, по порядку.</summary>
+        private static System.Collections.Generic.IEnumerable<string> LogPaths()
+        {
+            string возле = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(возле))
+            {
+                string папка = System.IO.Path.GetDirectoryName(возле);
+                if (!string.IsNullOrEmpty(папка))
+                {
+                    yield return System.IO.Path.Combine(папка, "ошибки.log");
+                }
+            }
+
+            string appData = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "JL-Monitor-Brightness");
+            System.IO.Directory.CreateDirectory(appData);
+            yield return System.IO.Path.Combine(appData, "ошибки.log");
         }
 
         private DateTime _lastDdcWarning = DateTime.MinValue;

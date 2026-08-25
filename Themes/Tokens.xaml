@@ -20,7 +20,10 @@
   <!-- Поверхности -->
   <SolidColorBrush x:Key="Bg"    Color="#F6F7FB" po:Freeze="True"/>
   <SolidColorBrush x:Key="Card"  Color="#FFFFFF" po:Freeze="True"/>
-  <SolidColorBrush x:Key="Glass" Color="#E8FFFFFF" po:Freeze="True"/>
+  <!-- Заливка поверх системного размытия: 60% вместо прежних 91%.
+       Размытие делает SetWindowCompositionAttribute, поэтому сквозь пилюлю
+       видно фон, но не резкую картинку — текст остаётся читаемым. -->
+  <SolidColorBrush x:Key="Glass" Color="#99FFFFFF" po:Freeze="True"/>
 
   <!-- Линии -->
   <SolidColorBrush x:Key="Hairline"       Color="#14141626" po:Freeze="True"/>

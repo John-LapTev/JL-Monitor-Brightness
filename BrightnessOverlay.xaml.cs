@@ -49,7 +49,10 @@ namespace JL_Monitor_Brightness
         /// <summary>Применяет настройки к оверлею. Публичный, чтобы окно не пересоздавать.</summary>
         public void ApplySettings()
         {
-            this.Opacity = _settings.OverlayOpacity;
+            // ⚠️ Прозрачность окна больше не берётся из настроек: стекло делает
+            // системное размытие, а Opacity на всём окне гасило бы и его, и текст.
+            // Настройка остаётся в файле для совместимости, но на вид не влияет.
+            this.Opacity = 1.0;
 
             // Акцент кладётся в ресурсы ПРИЛОЖЕНИЯ, а не окна: иначе смена темы
             // не доходит до остальных окон, а в дизайнере DynamicResource даёт null.
@@ -63,14 +66,8 @@ namespace JL_Monitor_Brightness
 
         private void BrightnessOverlay_Loaded(object sender, RoutedEventArgs e)
         {
-            PositionOnActiveScreen(); // Размещаем ближе к нижней части экрана
-            
-            // Анимация появления
-            this.Opacity = 0;
-            var animation = new DoubleAnimation(0, _settings.OverlayOpacity, TimeSpan.FromMilliseconds(250));
-            this.BeginAnimation(OpacityProperty, animation);
-            
-            // Запускаем таймер скрытия
+            PositionOnActiveScreen();
+            PlayRevealAnimation();
             StartHideTimer();
         }
 
@@ -130,7 +127,7 @@ namespace JL_Monitor_Brightness
 
             this.Opacity = 0;
             var fade = new DoubleAnimationUsingKeyFrames();
-            fade.KeyFrames.Add(new SplineDoubleKeyFrame(_settings.OverlayOpacity,
+            fade.KeyFrames.Add(new SplineDoubleKeyFrame(1.0,
                 KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), spline));
             this.BeginAnimation(OpacityProperty, fade);
 
@@ -158,7 +155,7 @@ namespace JL_Monitor_Brightness
             _hideTimer.Stop();
             
             // Уход быстрее появления: 160 мс, лёгкий уезд вниз.
-            var fade = new DoubleAnimation(_settings.OverlayOpacity, 0, TimeSpan.FromMilliseconds(160))
+            var fade = new DoubleAnimation(1.0, 0, TimeSpan.FromMilliseconds(160))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
@@ -246,6 +243,81 @@ namespace JL_Monitor_Brightness
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         private struct RECT { public int left, top, right, bottom; }
 
+        // ── Настоящее размытие фона ──────────────────────────────────────────────
+        // Мнение, что прозрачное окно WPF не может размывать фон, верно только для
+        // DwmSetWindowAttribute (Mica/Acrylic из Windows 11). Недокументированный
+        // SetWindowCompositionAttribute работает и с layered-окном — этим приёмом
+        // сделано стекло в большинстве WPF-приложений начиная с Windows 10 1803.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct WindowCompositionAttributeData
+        {
+            public int Attribute;
+            public IntPtr Data;
+            public int SizeOfData;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct AccentPolicy
+        {
+            public int AccentState;
+            public int AccentFlags;
+            public int GradientColor;
+            public int AnimationId;
+        }
+
+        private const int WCA_ACCENT_POLICY = 19;
+        private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+        private const int ACCENT_ENABLE_BLURBEHIND = 3;
+
+        /// <summary>
+        /// Включает размытие того, что находится ЗА окном. Без него прозрачная пилюля
+        /// показывала бы обои как есть, и текст скакал бы по контрасту в зависимости
+        /// от картинки под ним.
+        /// </summary>
+        private void EnableAcrylic(IntPtr handle)
+        {
+            // Цвет подложки в формате AABBGGRR (именно в таком порядке, не ARGB):
+            // светлая, слегка холодная, 40% — вместе с размытием даёт матовое стекло.
+            TryAccent(handle, ACCENT_ENABLE_ACRYLICBLURBEHIND, unchecked((int)0x66FBF9F7));
+        }
+
+        private static void TryAccent(IntPtr handle, int state, int color)
+        {
+            var accent = new AccentPolicy
+            {
+                AccentState = state,
+                AccentFlags = 2,   // рисовать все границы
+                GradientColor = color
+            };
+
+            int size = System.Runtime.InteropServices.Marshal.SizeOf(accent);
+            IntPtr ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+
+            try
+            {
+                System.Runtime.InteropServices.Marshal.StructureToPtr(accent, ptr, false);
+                var data = new WindowCompositionAttributeData
+                {
+                    Attribute = WCA_ACCENT_POLICY,
+                    SizeOfData = size,
+                    Data = ptr
+                };
+                SetWindowCompositionAttribute(handle, ref data);
+            }
+            catch
+            {
+                // API недокументированный: на будущих сборках Windows может исчезнуть.
+                // Тогда остаётся плотная заливка из разметки — вид хуже, но рабочий.
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr);
+            }
+        }
+
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_NOACTIVATE = 0x08000000;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
@@ -260,6 +332,8 @@ namespace JL_Monitor_Brightness
             var helper = new System.Windows.Interop.WindowInteropHelper(this);
             int style = GetWindowLong(helper.Handle, GWL_EXSTYLE);
             SetWindowLong(helper.Handle, GWL_EXSTYLE, style | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
+
+            EnableAcrylic(helper.Handle);
         }
 
         /// <summary>

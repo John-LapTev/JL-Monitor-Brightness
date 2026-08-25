@@ -27,7 +27,8 @@
       прежние 10 при высоте 120 выглядели прямыми углами.
 
       Настоящего размытия за окном не будет: AllowsTransparency исключает
-      DWM-backdrop. Поэтому стекло имитируется плотной заливкой с hairline —
+      DWM-backdrop, а системный акрил красит весь прямоугольник окна и вылезает
+      из-под скруглений. Поэтому стекло имитируется плотной заливкой с hairline —
       на 52 пикселях высоты этого достаточно, текст читается на любых обоях.
     -->
     <Grid>
@@ -39,7 +40,7 @@
         <Border x:Name="Pill" Grid.Row="0"
                 Width="320" Height="52"
                 CornerRadius="{StaticResource RPill}"
-                Background="{DynamicResource Glass}"
+                Background="{DynamicResource GlassSolid}"
                 BorderBrush="{DynamicResource Hairline}"
                 BorderThickness="1"
                 Effect="{StaticResource Shadow3}"

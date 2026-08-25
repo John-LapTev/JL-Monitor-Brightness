@@ -24,6 +24,10 @@
        видно фон, но не резкую картинку — текст остаётся читаемым. -->
   <SolidColorBrush x:Key="Glass" Color="#99FFFFFF" po:Freeze="True"/>
 
+  <!-- Заливка шторки яркости. Плотнее обычного стекла: за ней нет размытия,
+       и на пёстрых обоях полупрозрачная пилюля теряла бы текст. -->
+  <SolidColorBrush x:Key="GlassSolid" Color="#F5FBFAFF" po:Freeze="True"/>
+
   <!-- Линии -->
   <SolidColorBrush x:Key="Hairline"       Color="#14141626" po:Freeze="True"/>
   <SolidColorBrush x:Key="HairlineStrong" Color="#26141626" po:Freeze="True"/>
@@ -34,11 +38,6 @@
        к нему через DynamicResource. Живёт в ресурсах приложения, а не окна:
        иначе смена темы не доходит до остальных окон. -->
   <SolidColorBrush x:Key="PrimaryBrush" Color="#7C82F4"/>
-
-  <LinearGradientBrush x:Key="AccGradient" StartPoint="0,0" EndPoint="1,0" po:Freeze="True">
-    <GradientStop Color="#A78BFA" Offset="0"/>
-    <GradientStop Color="#60A5FA" Offset="1"/>
-  </LinearGradientBrush>
 
   <!-- Шрифт -->
   <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI, Arial</FontFamily>

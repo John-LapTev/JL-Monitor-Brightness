@@ -21,13 +21,27 @@
                     Background="{DynamicResource TrackBg}"
                     VerticalAlignment="Center"/>
 
-            <Border x:Name="Filled" Height="6" CornerRadius="3"
-                    HorizontalAlignment="Left" VerticalAlignment="Center"
-                    Background="{DynamicResource AccGradient}"/>
-
             <Track x:Name="PART_Track">
+              <!--
+                ⛔ Заполненная часть живёт ВНУТРИ DecreaseRepeatButton, а не рядом
+                с треком. Отдельный Border с HorizontalAlignment="Left" ширину
+                ниоткуда не получает — она остаётся нулевой, и полоса всегда серая
+                при любом значении. Так и было до 25.08.2026, пока не заметили.
+                Кнопка уменьшения занимает ровно ту часть трека, что слева от
+                бегунка, — её и красим.
+              -->
               <Track.DecreaseRepeatButton>
-                <RepeatButton Command="Slider.DecreaseLarge" Opacity="0" Focusable="False"/>
+                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False"
+                              Background="Transparent">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Grid Background="Transparent">
+                        <Border Height="6" CornerRadius="3" VerticalAlignment="Center"
+                                Background="{DynamicResource PrimaryBrush}"/>
+                      </Grid>
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
               </Track.DecreaseRepeatButton>
               <Track.Thumb>
                 <Thumb x:Name="Thumb" Width="16" Height="16" Focusable="False">
@@ -47,7 +61,13 @@
                 </Thumb>
               </Track.Thumb>
               <Track.IncreaseRepeatButton>
-                <RepeatButton Command="Slider.IncreaseLarge" Opacity="0" Focusable="False"/>
+                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Grid Background="Transparent"/>
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
               </Track.IncreaseRepeatButton>
             </Track>
           </Grid>

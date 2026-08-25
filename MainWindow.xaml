@@ -98,7 +98,7 @@
                            FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
 
-                <Button Grid.Column="2" Width="40" Height="44" Click="Minimize_Click"
+                <Button Grid.Column="2" Width="40" Height="44" Click="Minimize_Click" FocusVisualStyle="{x:Null}"
                         Style="{StaticResource ClearButton}" ToolTip="Свернуть">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
@@ -116,7 +116,7 @@
                     </Button.Template>
                 </Button>
 
-                <Button Grid.Column="3" Width="46" Height="44" Click="CloseWindow_Click" ToolTip="Закрыть">
+                <Button Grid.Column="3" Width="46" Height="44" Click="CloseWindow_Click" FocusVisualStyle="{x:Null}" ToolTip="Закрыть">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Bd" Background="Transparent" CornerRadius="0,13,0,0">

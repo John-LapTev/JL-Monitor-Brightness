@@ -9,6 +9,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <Style x:Key="HaloSlider" TargetType="Slider">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     <Setter Property="IsMoveToPointEnabled" Value="True"/>
     <Setter Property="Focusable" Value="False"/>
     <Setter Property="Template">

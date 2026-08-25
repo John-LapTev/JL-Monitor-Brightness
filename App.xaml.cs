@@ -390,7 +390,9 @@ namespace JL_Monitor_Brightness
 
                 // Акцент кладётся напрямую, а не только через оверлей: до первого
                 // вызова шторки оверлея ещё нет, и цвет не применился бы вовсе.
-                Resources["PrimaryBrush"] = _settings.CreateThemeBrush();
+                var accent = _settings.CreateThemeBrush();
+                Resources["PrimaryBrush"] = accent;
+                Resources["PrimaryColor"] = accent.Color;
                 _brightnessOverlay?.ApplySettings();
             };
 

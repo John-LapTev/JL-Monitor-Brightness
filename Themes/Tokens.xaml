@@ -39,6 +39,11 @@
        иначе смена темы не доходит до остальных окон. -->
   <SolidColorBrush x:Key="PrimaryBrush" Color="#7C82F4"/>
 
+  <!-- Тот же акцент отдельным Color: эффекты (свечение кнопки) принимают именно
+       Color, кисть им не подходит. Подменяется в рантайме вместе с кистью —
+       иначе свечение остаётся лавандовым при любом выбранном цвете. -->
+  <Color x:Key="PrimaryColor">#7C82F4</Color>
+
   <!-- Шрифт -->
   <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI, Arial</FontFamily>
   <FontFamily x:Key="UiFontDisplay">Segoe UI Variable Display, Segoe UI, Arial</FontFamily>

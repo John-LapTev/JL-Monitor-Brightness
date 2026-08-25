@@ -57,7 +57,9 @@ namespace JL_Monitor_Brightness
 
             // Акцент кладётся в ресурсы ПРИЛОЖЕНИЯ, а не окна: иначе смена темы
             // не доходит до остальных окон, а в дизайнере DynamicResource даёт null.
-            Application.Current.Resources["PrimaryBrush"] = _settings.CreateThemeBrush();
+            var accent = _settings.CreateThemeBrush();
+            Application.Current.Resources["PrimaryBrush"] = accent;
+            Application.Current.Resources["PrimaryColor"] = accent.Color;
 
             if (_hideTimer != null)
             {

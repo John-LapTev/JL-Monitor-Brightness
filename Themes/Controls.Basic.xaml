@@ -61,7 +61,7 @@
                   RenderTransformOrigin="0.5,0.5">
             <Border.RenderTransform><ScaleTransform x:Name="Sc"/></Border.RenderTransform>
             <Border.Effect>
-              <DropShadowEffect Color="#7C82F4" BlurRadius="18" ShadowDepth="4"
+              <DropShadowEffect Color="{DynamicResource PrimaryColor}" BlurRadius="18" ShadowDepth="4"
                                 Direction="270" Opacity="0.38"/>
             </Border.Effect>
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>

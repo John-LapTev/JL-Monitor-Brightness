@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using JL_Monitor_Brightness.Models;
 using JL_Monitor_Brightness.Services;
 using Microsoft.Win32;
@@ -156,12 +157,43 @@ namespace JL_Monitor_Brightness
             if (_settings.SaveSettings())
             {
                 UpdateStartupRegistry();
-                MessageBox.Show("Настройки успешно сохранены", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowSaveToast("Сохранено", ok: true);
             }
             else
             {
-                MessageBox.Show("Ошибка при сохранении настроек", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowSaveToast("Не удалось сохранить", ok: false);
             }
+        }
+
+        /// <summary>
+        /// Плашка подтверждения внизу окна.
+        ///
+        /// ⛔ Раньше здесь был MessageBox. Он приходил со звуком системной ошибки на
+        /// обычное успешное сохранение, требовал нажать «ОК», а следом окно ещё и
+        /// закрывалось — чтобы поправить вторую настройку, приходилось лезть в трей.
+        /// Замечено при проверке 25.08.2026.
+        /// </summary>
+        private void ShowSaveToast(string message, bool ok)
+        {
+            SaveToastText.Text = message;
+            SaveToast.Background = ok
+                ? (Brush)Application.Current.Resources["PrimaryBrush"]
+                : new SolidColorBrush(Color.FromRgb(0xE1, 0x4B, 0x4B));
+
+            // Появление, пауза, уход. BeginTime у второй пары держит плашку на
+            // экране: две секунды — успеваешь прочитать, но не ждёшь.
+            var fade = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(2.4) };
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.16))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(2.0))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(2.4))));
+
+            var slide = new DoubleAnimation(6, 0, TimeSpan.FromSeconds(0.22))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            SaveToast.BeginAnimation(OpacityProperty, fade);
+            SaveToastSlide.BeginAnimation(TranslateTransform.YProperty, slide);
         }
 
         private const string RunKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -615,8 +647,9 @@ namespace JL_Monitor_Brightness
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            // ⛔ Окно НЕ закрывается: настройки правят пачкой, а после каждого
+            // сохранения приходилось поднимать его заново из трея.
             SaveSettings();
-            Close();
         }
 
         private void CancelButton_Click(object sender, EventArgs e)

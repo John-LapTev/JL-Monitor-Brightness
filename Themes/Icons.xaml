@@ -7,7 +7,7 @@
                     xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
 
   <!-- Солнце: круг и восемь лучей -->
-  <GeometryGroup x:Key="IconSun" po:Freeze="True">
+  <GeometryGroup x:Key="IconSun">
     <EllipseGeometry Center="12,12" RadiusX="4.2" RadiusY="4.2"/>
     <LineGeometry StartPoint="12,1.6"  EndPoint="12,4.2"/>
     <LineGeometry StartPoint="12,19.8" EndPoint="12,22.4"/>
@@ -20,7 +20,7 @@
   </GeometryGroup>
 
   <!-- Монитор -->
-  <GeometryGroup x:Key="IconMonitor" po:Freeze="True">
+  <GeometryGroup x:Key="IconMonitor">
     <RectangleGeometry Rect="2,3.5,20,13" RadiusX="2" RadiusY="2"/>
     <LineGeometry StartPoint="8,20.5" EndPoint="16,20.5"/>
     <LineGeometry StartPoint="12,16.5" EndPoint="12,20.5"/>

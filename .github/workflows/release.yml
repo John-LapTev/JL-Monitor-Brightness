@@ -62,12 +62,29 @@ jobs:
           $v = '${{ steps.ver.outputs.version }}'
           Move-Item publish/portable/JL-Monitor-Brightness.exe "publish/JL_MonitorBrightness_${v}_Portable.exe"
 
+      # Описание релиза берётся из CHANGELOG, а не генерируется из коммитов:
+      # его же показывает окно обновления внутри программы, и человеку нужен
+      # человеческий текст, а не список сообщений git.
+      - name: Достать описание из истории версий
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $md = Get-Content CHANGELOG.md -Raw
+          $m = [regex]::Match($md, "(?ms)^## \[$([regex]::Escape($v))\][^\n]*\n(.*?)(?=^## \[|\z)")
+          if ($m.Success) {
+            $m.Groups[1].Value.Trim() | Out-File -FilePath release-notes.md -Encoding utf8
+          } else {
+            "Версия $v" | Out-File -FilePath release-notes.md -Encoding utf8
+            Write-Host "В CHANGELOG нет раздела для $v — описание будет пустым"
+          }
+          Get-Content release-notes.md
+
       - name: Выложить релиз
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ steps.ver.outputs.version }}
           tag_name: v${{ steps.ver.outputs.version }}
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             Output/*.exe
             publish/*.exe

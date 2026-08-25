@@ -1,5 +1,5 @@
 ﻿#define MyAppName "JL Monitor Brightness"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "JL Studio"
 #define MyAppURL "https://jl-studio.art/"
 #define MyAppExeName "JL-Monitor-Brightness.exe"

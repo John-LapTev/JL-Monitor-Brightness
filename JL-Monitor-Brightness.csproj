@@ -15,7 +15,7 @@
     <!-- Единственный источник версии. Раньше она была продублирована в трёх местах
          (csproj, Settings.cs, .iss) и при этом не попадала в сборку вовсе,
          потому что стоял GenerateAssemblyInfo=false. -->
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
 
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

@@ -17,6 +17,9 @@
 
   <Style x:Key="GhostButton" TargetType="Button">
     <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <!-- ⚠️ Без этого кнопка внутри строки настроек растягивается на всю её высоту
+         (44 px) и упирается в разделительную линию. Замечено 25.08.2026. -->
+    <Setter Property="VerticalAlignment" Value="Center"/>
     <Setter Property="Foreground" Value="{DynamicResource Ink2}"/>
     <Setter Property="FontSize" Value="12.5"/>
     <Setter Property="Padding" Value="12,7"/>

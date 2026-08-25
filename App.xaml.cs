@@ -341,6 +341,14 @@ namespace JL_Monitor_Brightness
                 if (_brightnessOverlay != null)
                 {
                     _brightnessOverlay.MonitorCount = monitors.Count;
+
+                    // ⚠️ Старые хендлы DDC/CI уже уничтожены. Если шторка открыта, у неё
+                    // осталась ссылка на прежний объект монитора, и следующая запись
+                    // яркости ушла бы в мёртвый хендл. Передаём новый.
+                    if (_brightnessOverlay.IsVisible)
+                    {
+                        _brightnessOverlay.SetMonitor(_currentMonitor);
+                    }
                 }
                 
                 // Обновляем список мониторов в трее
@@ -352,6 +360,7 @@ namespace JL_Monitor_Brightness
             else
             {
                 _currentMonitor = null;
+                _brightnessOverlay?.ForgetMonitor();
                 _trayService.UpdateBrightnessMenuItems(false);
                 _trayService.ShowNotification("Мониторы не найдены", 
                     "Не удалось найти мониторы, поддерживающие регулировку яркости.", 
@@ -380,7 +389,7 @@ namespace JL_Monitor_Brightness
             }
             
             // Создаем новое окно настроек
-            _mainWindow = new MainWindow(_monitorService, _hotkeyService, _settings);
+            _mainWindow = new MainWindow(_monitorService, _hotkeyService, _settings, _updateService);
 
             // Сохранение применяется сразу, не дожидаясь закрытия окна: настройки
             // правят пачкой и хотят видеть результат тут же.
@@ -421,178 +430,5 @@ namespace JL_Monitor_Brightness
             _mainWindow.Show();
             _mainWindow.Activate();
         }
-
-        private async void CheckForUpdatesAsync(bool showNoUpdatesMessage)
-        {
-            try
-            {
-                // Показываем индикатор проверки в трее
-                _trayService.ShowNotification("Проверка обновлений", 
-                    "Проверка наличия новых версий...", 
-                    BalloonIcon.Info);
-                
-                // Выполняем проверку
-                var updateInfo = await _updateService.CheckForUpdatesAsync();
-                
-                // Обновляем дату последней проверки
-                _settings.LastUpdateCheck = DateTime.Now;
-                _settings.SaveSettings();
-                
-                // Если произошла ошибка при проверке
-                if (updateInfo == null)
-                {
-                    _trayService.ShowNotification("Ошибка проверки обновлений", 
-                        "Не удалось проверить наличие обновлений. Проверьте подключение к интернету.", 
-                        BalloonIcon.Error);
-                    return;
-                }
-                
-                // Пользователь мог попросить не напоминать про конкретную версию.
-                // При ручной проверке (showNoUpdatesMessage) пропуск игнорируем — он сам спросил.
-                bool skipped = !showNoUpdatesMessage
-                    && !string.IsNullOrEmpty(_settings.SkippedVersion)
-                    && string.Equals(_settings.SkippedVersion, updateInfo.LatestVersion,
-                                     StringComparison.OrdinalIgnoreCase);
-
-                // Если есть новая версия
-                if (!skipped && _updateService.IsUpdateAvailable(updateInfo, _settings.CurrentVersion))
-                {
-                    // Показываем окно обновления
-                    var updateWindow = new UpdateWindow(updateInfo, _settings, _updateService);
-                    updateWindow.ShowDialog();
-                }
-                else if (showNoUpdatesMessage)
-                {
-                    // Если обновлений нет и пользователь запросил проверку вручную
-                    _trayService.ShowNotification("Обновлений нет", 
-                        "У вас установлена последняя версия программы.", 
-                        BalloonIcon.Info);
-                }
-            }
-            catch (Exception ex)
-            {
-                _trayService.ShowNotification("Ошибка проверки обновлений", 
-                    $"Произошла ошибка: {ex.Message}", 
-                    BalloonIcon.Error);
-            }
-        }
-
-        #region Event Handlers
-        private void HotkeyService_BrightnessUpPressed(object sender, NHotkey.HotkeyEventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _monitorService.IncreaseBrightness(_currentMonitor, _settings.BrightnessStep);
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-
-        private void HotkeyService_BrightnessDownPressed(object sender, NHotkey.HotkeyEventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _monitorService.DecreaseBrightness(_currentMonitor, _settings.BrightnessStep);
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-
-        private void HotkeyService_BrightnessOverlayPressed(object sender, NHotkey.HotkeyEventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-
-        private void TrayService_OpenSettingsRequested(object sender, EventArgs e)
-        {
-            ShowSettings();
-        }
-
-        private void TrayService_ExitRequested(object sender, EventArgs e)
-        {
-            // Иначе OnClosing окна настроек перехватит закрытие и снова спрячет его в трей.
-            _mainWindow?.CloseForReal();
-            Shutdown();
-        }
-
-        private void TrayService_MonitorSelected(object sender, int e)
-        {
-            var monitors = _monitorService.GetMonitors();
-            if (monitors.Count > e)
-            {
-                _currentMonitor = monitors[e];
-                _settings.DefaultMonitorIndex = e;
-                _settings.SaveSettings();
-            }
-        }
-
-        private void TrayService_BrightnessIncreaseRequested(object sender, EventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _monitorService.IncreaseBrightness(_currentMonitor, _settings.BrightnessStep);
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-
-        private void TrayService_BrightnessDecreaseRequested(object sender, EventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _monitorService.DecreaseBrightness(_currentMonitor, _settings.BrightnessStep);
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-
-        private void TrayService_ShowOverlayRequested(object sender, EventArgs e)
-        {
-            if (СообщитьЕслиНетМониторов())
-            {
-                return;
-            }
-
-            if (_currentMonitor != null)
-            {
-                _brightnessOverlay.SetMonitor(_currentMonitor);
-                _brightnessOverlay.ShowOverlay();
-            }
-        }
-        
-        private void TrayService_CheckForUpdatesRequested(object sender, EventArgs e)
-        {
-            CheckForUpdatesAsync(true);
-        }
-        #endregion
     }
 }

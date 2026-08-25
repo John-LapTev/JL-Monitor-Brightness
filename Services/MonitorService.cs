@@ -189,14 +189,12 @@ namespace JL_Monitor_Brightness.Services
         public void Dispose()
         {
             ReleaseMonitors();
-            GC.SuppressFinalize(this);
         }
 
-        ~MonitorService()
-        {
-            // Страховка: если Dispose забыли, хендлы всё равно вернутся драйверу.
-            ReleaseMonitors();
-        }
+        // ⛔ Финализатора здесь нет намеренно. Он работал бы в потоке сборщика мусора,
+        // где порядок не определён, и вызывал бы оттуда DestroyPhysicalMonitor. Хендлы
+        // и без того возвращаются драйверу при завершении процесса, а Dispose зовётся
+        // из Application_Exit — страховка обходилась дороже, чем защищала.
     }
 
     public class PhysicalMonitorInfo

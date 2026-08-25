@@ -23,14 +23,20 @@ namespace JL_Monitor_Brightness
         private ModifierKeys _currentModifiers;
         private Key _currentKey;
 
-        public MainWindow(MonitorService monitorService, HotkeyService hotkeyService, Settings settings)
+        /// <summary>
+        /// Службу обновлений окно получает снаружи, а не заводит свою: внутри неё
+        /// живёт HttpClient, а его положено переиспользовать, не плодить на каждое
+        /// открытие настроек.
+        /// </summary>
+        public MainWindow(MonitorService monitorService, HotkeyService hotkeyService,
+                          Settings settings, UpdateService updateService)
         {
             InitializeComponent();
             
             _monitorService = monitorService;
             _hotkeyService = hotkeyService;
             _settings = settings;
-            _updateService = new UpdateService();
+            _updateService = updateService;
             
             LoadSettings();
             PopulateMonitors();
@@ -410,174 +416,6 @@ namespace JL_Monitor_Brightness
             PopulateMonitors();
         }
 
-        private void HotkeyTextBox_GotFocus(object sender, RoutedEventArgs e)
-        {
-            _currentHotkeyTextBox = sender as TextBox;
-            if (_currentHotkeyTextBox != null)
-            {
-                _currentHotkeyTextBox.Text = "Нажмите комбинацию клавиш...";
-                _currentModifiers = ModifierKeys.None;
-                _currentKey = Key.None;
-            }
-        }
-
-        private void HotkeyTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            TextBox textBox = sender as TextBox;
-            if (textBox != null && textBox.Text == "Нажмите комбинацию клавиш...")
-            {
-                // Восстанавливаем исходную горячую клавишу
-                if (textBox == BrightnessUpHotkeyTextBox)
-                {
-                    textBox.Text = _hotkeyService.GetHotkeyDescription("BrightnessUp");
-                }
-                else if (textBox == BrightnessDownHotkeyTextBox)
-                {
-                    textBox.Text = _hotkeyService.GetHotkeyDescription("BrightnessDown");
-                }
-                else if (textBox == BrightnessOverlayHotkeyTextBox)
-                {
-                    textBox.Text = _hotkeyService.GetHotkeyDescription("BrightnessOverlay");
-                }
-            }
-            
-            _currentHotkeyTextBox = null;
-        }
-
-        private void HotkeyTextBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-            
-            if (_currentHotkeyTextBox == null) return;
-            
-            // Получаем модификаторы и клавишу
-            _currentModifiers = Keyboard.Modifiers;
-            // При зажатом Alt WPF кладёт в e.Key значение Key.System,
-            // а настоящую клавишу — в e.SystemKey. Без этого ни одну
-            // комбинацию с Alt назначить нельзя.
-            _currentKey = e.Key == Key.System ? e.SystemKey : e.Key;
-            
-            // Игнорируем сами модификаторы как ключевые клавиши
-            if (_currentKey == Key.LeftCtrl || _currentKey == Key.RightCtrl ||
-                _currentKey == Key.LeftAlt || _currentKey == Key.RightAlt ||
-                _currentKey == Key.LeftShift || _currentKey == Key.RightShift ||
-                _currentKey == Key.LWin || _currentKey == Key.RWin ||
-                _currentKey == Key.System)
-            {
-                return;
-            }
-            
-            // Требуем хотя бы один модификатор
-            if (_currentModifiers == ModifierKeys.None)
-            {
-                _currentHotkeyTextBox.Text = "Нажмите с модификатором (Ctrl, Alt, Shift)";
-                return;
-            }
-            
-            // Создаем описание горячей клавиши
-            string description = string.Empty;
-            
-            if ((_currentModifiers & ModifierKeys.Alt) == ModifierKeys.Alt)
-                description += "Alt + ";
-            if ((_currentModifiers & ModifierKeys.Control) == ModifierKeys.Control)
-                description += "Ctrl + ";
-            if ((_currentModifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
-                description += "Shift + ";
-            if ((_currentModifiers & ModifierKeys.Windows) == ModifierKeys.Windows)
-                description += "Win + ";
-            
-            description += _currentKey.ToString();
-            
-            _currentHotkeyTextBox.Text = description;
-            
-            // Обновляем сервис горячих клавиш
-            string hotkeyName = string.Empty;
-            
-            if (_currentHotkeyTextBox == BrightnessUpHotkeyTextBox)
-            {
-                hotkeyName = "BrightnessUp";
-                _settings.BrightnessUpKey = (int)_currentKey;
-                _settings.BrightnessUpModifiers = (int)_currentModifiers;
-            }
-            else if (_currentHotkeyTextBox == BrightnessDownHotkeyTextBox)
-            {
-                hotkeyName = "BrightnessDown";
-                _settings.BrightnessDownKey = (int)_currentKey;
-                _settings.BrightnessDownModifiers = (int)_currentModifiers;
-            }
-            else if (_currentHotkeyTextBox == BrightnessOverlayHotkeyTextBox)
-            {
-                hotkeyName = "BrightnessOverlay";
-                _settings.BrightnessOverlayKey = (int)_currentKey;
-                _settings.BrightnessOverlayModifiers = (int)_currentModifiers;
-            }
-            
-            if (!string.IsNullOrEmpty(hotkeyName))
-            {
-                try
-                {
-                    // ⚠️ Раньше здесь снимались ВСЕ три комбинации, а регистрировалась
-                    // обратно только редактируемая: пока открыты настройки, две другие
-                    // были мертвы. UpdateHotkey сам делает Remove нужной перед AddOrReplace.
-                    
-                    // Регистрируем новую горячую клавишу
-                    bool success = _hotkeyService.UpdateHotkey(hotkeyName, _currentKey, _currentModifiers);
-                    
-                    if (!success)
-                    {
-                        MessageBox.Show($"Не удалось зарегистрировать горячую клавишу: {description}\nВозможно, она уже используется другим приложением.", 
-                                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        _currentHotkeyTextBox.Text = "Ошибка регистрации!";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при регистрации горячей клавиши: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    _currentHotkeyTextBox.Text = "Ошибка регистрации!";
-                }
-            }
-            
-            // Снимаем фокус с текстового поля
-            Keyboard.ClearFocus();
-        }
-
-        private void ClearHotkeyButton_Click(object sender, RoutedEventArgs e)
-        {
-            Button button = sender as Button;
-            if (button == null) return;
-            
-            string hotkeyName = button.Tag.ToString();
-            
-            // Очищаем текстовое поле и настройки
-            if (hotkeyName == "BrightnessUp")
-            {
-                BrightnessUpHotkeyTextBox.Text = "Не задано";
-                _settings.BrightnessUpKey = (int)Key.None;
-                _settings.BrightnessUpModifiers = (int)ModifierKeys.None;
-            }
-            else if (hotkeyName == "BrightnessDown")
-            {
-                BrightnessDownHotkeyTextBox.Text = "Не задано";
-                _settings.BrightnessDownKey = (int)Key.None;
-                _settings.BrightnessDownModifiers = (int)ModifierKeys.None;
-            }
-            else if (hotkeyName == "BrightnessOverlay")
-            {
-                BrightnessOverlayHotkeyTextBox.Text = "Не задано";
-                _settings.BrightnessOverlayKey = (int)Key.None;
-                _settings.BrightnessOverlayModifiers = (int)ModifierKeys.None;
-            }
-            
-            try
-            {
-                // Удаляем горячую клавишу
-                _hotkeyService.UpdateHotkey(hotkeyName, Key.None, ModifierKeys.None);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка при удалении горячей клавиши: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
@@ -614,51 +452,6 @@ namespace JL_Monitor_Brightness
             }
         }
         
-        private void CheckForUpdatesCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_isInitializing) return;
-            // Нет необходимости делать что-то здесь, настройка будет сохранена при нажатии кнопки "Сохранить"
-        }
-        
-        private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                CheckForUpdatesButton.IsEnabled = false;
-                CheckForUpdatesButton.Content = "Проверка...";
-                
-                var updateInfo = await _updateService.CheckForUpdatesAsync();
-                
-                CheckForUpdatesButton.IsEnabled = true;
-                CheckForUpdatesButton.Content = "Проверить обновления сейчас";
-                
-                if (updateInfo == null)
-                {
-                    MessageBox.Show("Не удалось проверить наличие обновлений. Проверьте подключение к интернету.",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                
-                if (_updateService.IsUpdateAvailable(updateInfo, _settings.CurrentVersion))
-                {
-                    var updateWindow = new UpdateWindow(updateInfo, _settings, _updateService);
-                    updateWindow.ShowDialog();
-                }
-                else
-                {
-                    MessageBox.Show("У вас установлена последняя версия программы.",
-                        "Обновлений нет", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                CheckForUpdatesButton.IsEnabled = true;
-                CheckForUpdatesButton.Content = "Проверить обновления сейчас";
-                
-                MessageBox.Show($"Произошла ошибка при проверке обновлений: {ex.Message}",
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {

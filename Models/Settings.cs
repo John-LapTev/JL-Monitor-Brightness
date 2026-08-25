@@ -205,10 +205,25 @@ namespace JL_Monitor_Brightness.Models
                     Directory.CreateDirectory(directory);
                 }
 
-                using (var stream = new FileStream(SettingsFilePath, FileMode.Create))
+                // ⚠️ Пишем во временный файл и подменяем им настоящий. Прямая запись
+                // поверх обрезает файл в самом начале: прервись она (питание, сбой) —
+                // на диске остался бы обрубок, и программа молча уехала бы в значения
+                // по умолчанию, потеряв все настройки.
+                string temp = SettingsFilePath + ".tmp";
+                using (var stream = new FileStream(temp, FileMode.Create))
                 {
                     var serializer = new XmlSerializer(typeof(Settings));
                     serializer.Serialize(stream, this);
+                    stream.Flush(true);
+                }
+
+                if (File.Exists(SettingsFilePath))
+                {
+                    File.Replace(temp, SettingsFilePath, null);
+                }
+                else
+                {
+                    File.Move(temp, SettingsFilePath);
                 }
                 return true;
             }

@@ -207,6 +207,35 @@ namespace JL_Monitor_Brightness
         }
 
         private DateTime _lastDdcWarning = DateTime.MinValue;
+        private DateTime _lastNoMonitorsHint = DateTime.MinValue;
+
+        /// <summary>
+        /// Сообщает, что управлять нечем. Возвращает true, если мониторов нет.
+        ///
+        /// Без этого нажатие горячей клавиши на компьютере без внешнего монитора
+        /// выглядело как поломка: человек жмёт, ничего не происходит, никаких
+        /// объяснений. Замечание тестировщика 25.08.2026.
+        /// </summary>
+        private bool СообщитьЕслиНетМониторов()
+        {
+            if (_currentMonitor != null)
+            {
+                return false;
+            }
+
+            // Не чаще раза в полминуты: клавишу жмут подряд, а не по одному разу.
+            if (DateTime.Now - _lastNoMonitorsHint >= TimeSpan.FromSeconds(30))
+            {
+                _lastNoMonitorsHint = DateTime.Now;
+                _trayService?.ShowNotification(
+                    "Управлять нечем",
+                    "Внешние мониторы с поддержкой DDC/CI не найдены. Встроенный экран " +
+                    "ноутбука программа не регулирует — для него есть клавиши на самом ноутбуке.",
+                    BalloonIcon.Info);
+            }
+
+            return true;
+        }
 
         private void BrightnessOverlay_BrightnessFailed(object sender, PhysicalMonitorInfo monitor)
         {
@@ -436,6 +465,11 @@ namespace JL_Monitor_Brightness
         #region Event Handlers
         private void HotkeyService_BrightnessUpPressed(object sender, NHotkey.HotkeyEventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _monitorService.IncreaseBrightness(_currentMonitor, _settings.BrightnessStep);
@@ -446,6 +480,11 @@ namespace JL_Monitor_Brightness
 
         private void HotkeyService_BrightnessDownPressed(object sender, NHotkey.HotkeyEventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _monitorService.DecreaseBrightness(_currentMonitor, _settings.BrightnessStep);
@@ -456,6 +495,11 @@ namespace JL_Monitor_Brightness
 
         private void HotkeyService_BrightnessOverlayPressed(object sender, NHotkey.HotkeyEventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _brightnessOverlay.SetMonitor(_currentMonitor);
@@ -488,6 +532,11 @@ namespace JL_Monitor_Brightness
 
         private void TrayService_BrightnessIncreaseRequested(object sender, EventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _monitorService.IncreaseBrightness(_currentMonitor, _settings.BrightnessStep);
@@ -498,6 +547,11 @@ namespace JL_Monitor_Brightness
 
         private void TrayService_BrightnessDecreaseRequested(object sender, EventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _monitorService.DecreaseBrightness(_currentMonitor, _settings.BrightnessStep);
@@ -508,6 +562,11 @@ namespace JL_Monitor_Brightness
 
         private void TrayService_ShowOverlayRequested(object sender, EventArgs e)
         {
+            if (СообщитьЕслиНетМониторов())
+            {
+                return;
+            }
+
             if (_currentMonitor != null)
             {
                 _brightnessOverlay.SetMonitor(_currentMonitor);

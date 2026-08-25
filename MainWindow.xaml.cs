@@ -95,6 +95,24 @@ namespace JL_Monitor_Brightness
                     Tag = i
                 });
             }
+
+            // Пустой список без объяснения выглядит как поломка. Говорим прямо,
+            // что мониторов нет и почему — замечание тестировщика 25.08.2026.
+            if (monitors.Count == 0)
+            {
+                DefaultMonitorComboBox.Items.Add(new ComboBoxItem
+                {
+                    Content = "Мониторы с DDC/CI не найдены",
+                    IsEnabled = false,
+                });
+                DefaultMonitorComboBox.SelectedIndex = 0;
+                DefaultMonitorComboBox.ToolTip =
+                    "Программа управляет только внешними мониторами с поддержкой DDC/CI. " +
+                    "Встроенный экран ноутбука регулируется его собственными клавишами.";
+                return;
+            }
+
+            DefaultMonitorComboBox.ToolTip = null;
             
             if (DefaultMonitorComboBox.Items.Count > _settings.DefaultMonitorIndex)
             {
@@ -216,6 +234,27 @@ namespace JL_Monitor_Brightness
                 FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
             };
             content.BeginAnimation(OpacityProperty, fade);
+        }
+
+        /// <summary>
+        /// Двойной клик по ползунку возвращает значение по умолчанию.
+        /// Просьба тестировщика 25.08.2026 — привычка из программ со звуком, где так
+        /// сбрасывают любую ручку. Значение лежит в Tag рядом с самим ползунком,
+        /// чтобы не держать вторую таблицу умолчаний в коде.
+        /// </summary>
+        private void Slider_ResetToDefault(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is not Slider slider || slider.Tag is not string текст)
+            {
+                return;
+            }
+
+            if (double.TryParse(текст, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out double значение))
+            {
+                slider.Value = значение;
+                e.Handled = true;
+            }
         }
 
         #region Окно без системной рамки

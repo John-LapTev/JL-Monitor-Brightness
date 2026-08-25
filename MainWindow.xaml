@@ -181,7 +181,7 @@
                                     <Grid Style="{StaticResource Row}">
                                         <TextBlock Text="Шаг изменения яркости" Style="{StaticResource RowLabel}"/>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Slider x:Name="BrightnessStepSlider" Width="160"
+                                            <Slider x:Name="BrightnessStepSlider" Tag="10" MouseDoubleClick="Slider_ResetToDefault" Width="160"
                                                     Style="{StaticResource HaloSlider}"
                                                     Minimum="1" Maximum="20" Value="10"
                                                     TickFrequency="1" IsSnapToTickEnabled="True"
@@ -266,7 +266,7 @@
                                     <Grid Style="{StaticResource Row}">
                                         <TextBlock Text="Прозрачность" Style="{StaticResource RowLabel}"/>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Slider x:Name="OpacitySlider" Width="160"
+                                            <Slider x:Name="OpacitySlider" Tag="0.9" MouseDoubleClick="Slider_ResetToDefault" Width="160"
                                                     Style="{StaticResource HaloSlider}"
                                                     Minimum="0.3" Maximum="1" Value="0.9"
                                                     VerticalAlignment="Center"
@@ -280,7 +280,7 @@
                                     <Grid Style="{StaticResource Row}">
                                         <TextBlock Text="Время отображения" Style="{StaticResource RowLabel}"/>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Slider x:Name="TimeoutSlider" Width="160"
+                                            <Slider x:Name="TimeoutSlider" Tag="1400" MouseDoubleClick="Slider_ResetToDefault" Width="160"
                                                     Style="{StaticResource HaloSlider}"
                                                     Minimum="800" Maximum="6000" Value="1400"
                                                     TickFrequency="100" IsSnapToTickEnabled="True"

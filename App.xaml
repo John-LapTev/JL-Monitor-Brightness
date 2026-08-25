@@ -14,6 +14,7 @@
                 <ResourceDictionary Source="Themes/Controls.Slider.xaml"/>
                 <ResourceDictionary Source="Themes/Controls.Basic.xaml"/>
                 <ResourceDictionary Source="Themes/Controls.Complex.xaml"/>
+                <ResourceDictionary Source="Themes/FocusVisuals.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

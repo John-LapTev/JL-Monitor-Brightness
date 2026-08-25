@@ -97,6 +97,7 @@
   <!-- ── Вкладки-сегменты вместо TabControl ──────────────────────────────── -->
 
   <Style x:Key="SegmentTabs" TargetType="TabControl">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="Template">
@@ -188,6 +189,7 @@
   <!-- ── Тонкая полоса прокрутки ─────────────────────────────────────────── -->
 
   <Style x:Key="ThinScrollBar" TargetType="ScrollBar">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     <Setter Property="Width" Value="8"/>
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="Template">

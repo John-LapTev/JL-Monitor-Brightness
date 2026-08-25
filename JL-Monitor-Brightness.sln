@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JL-Monitor-Brightness", "JL-Monitor-Brightness\JL-Monitor-Brightness.csproj", "{EAD81A71-58E4-4F1C-AABC-DD10F830EFF1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JL-Monitor-Brightness", "JL-Monitor-Brightness.csproj", "{EAD81A71-58E4-4F1C-AABC-DD10F830EFF1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

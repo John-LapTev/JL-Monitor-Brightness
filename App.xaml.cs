@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Input;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -18,10 +20,32 @@ namespace JL_Monitor_Brightness
         private Settings _settings;
         
         private PhysicalMonitorInfo _currentMonitor;
-        private int _currentMonitorIndex = 0;
+
+        private const string InstanceMutexName = "Global\\JL-Monitor-Brightness-SingleInstance";
+        private Mutex _instanceMutex;
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Второй запуск даёт вторую иконку в трее, а регистрация горячих клавиш
+            // падает на конфликте — раньше это было особенно вероятно из-за сломанного
+            // автозапуска, когда программу запускали руками поверх уже работающей.
+            _instanceMutex = new Mutex(true, InstanceMutexName, out bool isFirstInstance);
+            if (!isFirstInstance)
+            {
+                Shutdown();
+                return;
+            }
+
+            // Без этого любое исключение вне try оставляет процесс-зомби:
+            // окна нет, иконки в трее нет, а процесс жив.
+            DispatcherUnhandledException += (s, args) =>
+            {
+                ShowFatal(args.Exception);
+                args.Handled = true;
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+                ShowFatal(args.ExceptionObject as Exception);
+
             try
             {
                 // Загружаем настройки
@@ -35,8 +59,14 @@ namespace JL_Monitor_Brightness
                 
                 // Инициализируем оверлей
                 _brightnessOverlay = new BrightnessOverlay(_monitorService, _settings);
+                _brightnessOverlay.BrightnessFailed += BrightnessOverlay_BrightnessFailed;
                 
                 // Регистрируем обработчики событий для горячих клавиш
+                _hotkeyService.RegistrationFailed += (s, combo) =>
+                    _trayService?.ShowNotification(
+                        "Горячая клавиша занята",
+                        $"Комбинацию {combo} держит другая программа. Задайте другую в настройках.",
+                        BalloonIcon.Warning);
                 _hotkeyService.BrightnessUpPressed += HotkeyService_BrightnessUpPressed;
                 _hotkeyService.BrightnessDownPressed += HotkeyService_BrightnessDownPressed;
                 _hotkeyService.BrightnessOverlayPressed += HotkeyService_BrightnessOverlayPressed;
@@ -55,6 +85,12 @@ namespace JL_Monitor_Brightness
                 
                 // Обновляем список мониторов
                 RefreshMonitors();
+
+                // ⚠️ Без этих подписок список мониторов строился ровно один раз за запуск:
+                // подключил монитор — его нет, отключил или вышел из сна — хендлы протухли
+                // и горячие клавиши молча переставали работать до перезапуска программы.
+                SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
+                SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
                 
                 // Регистрируем горячие клавиши
                 RegisterHotkeys();
@@ -63,7 +99,8 @@ namespace JL_Monitor_Brightness
                 bool showSettings = true;
                 foreach (string arg in e.Args)
                 {
-                    if (arg.ToLower() == "/minimized" || arg.ToLower() == "-minimized")
+                    if (string.Equals(arg, "/minimized", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(arg, "-minimized", StringComparison.OrdinalIgnoreCase))
                     {
                         showSettings = false;
                         break;
@@ -102,10 +139,72 @@ namespace JL_Monitor_Brightness
 
         private void Application_Exit(object sender, ExitEventArgs e)
         {
-            // Освобождаем ресурсы
-            _hotkeyService.UnregisterHotkeys();
-            _monitorService.ReleaseMonitors();
-            _trayService.Dispose();
+            // ?. обязателен: если старт упал на ранней стадии, часть сервисов ещё null,
+            // и выход из программы завершался NullReferenceException.
+            SystemEvents.DisplaySettingsChanged -= SystemEvents_DisplaySettingsChanged;
+            SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
+            _hotkeyService?.UnregisterHotkeys();
+            _monitorService?.Dispose();
+            _trayService?.Dispose();
+            _instanceMutex?.ReleaseMutex();
+            _instanceMutex?.Dispose();
+        }
+
+        private static void ShowFatal(Exception ex)
+        {
+            MessageBox.Show(
+                $"Непредвиденная ошибка: {ex?.Message}\n\n{ex?.StackTrace}",
+                "JL Monitor Brightness", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private DateTime _lastDdcWarning = DateTime.MinValue;
+
+        private void BrightnessOverlay_BrightnessFailed(object sender, PhysicalMonitorInfo monitor)
+        {
+            // Не чаще раза в полминуты: при зажатой клавише отказов будет десяток подряд.
+            if (DateTime.Now - _lastDdcWarning < TimeSpan.FromSeconds(30))
+            {
+                return;
+            }
+
+            _lastDdcWarning = DateTime.Now;
+            _trayService?.ShowNotification(
+                "Монитор не отвечает",
+                $"«{monitor?.Description}» не принял яркость. Проверьте, включён ли DDC/CI " +
+                "в меню монитора, и не подключён ли он через переходник или док-станцию.",
+                BalloonIcon.Warning);
+        }
+
+        private void SystemEvents_DisplaySettingsChanged(object sender, EventArgs e)
+        {
+            // Конфигурация экранов поменялась — старые хендлы недействительны.
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshMonitors();
+                _trayService?.UpdateMonitorsList();
+            }));
+        }
+
+        private void SystemEvents_PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode != PowerModes.Resume)
+            {
+                return;
+            }
+
+            // После пробуждения монитор отвечает не сразу: DDC/CI поднимается
+            // с задержкой, и немедленное перечисление вернёт пустой список.
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3)
+            };
+            timer.Tick += (s, args) =>
+            {
+                timer.Stop();
+                RefreshMonitors();
+                _trayService?.UpdateMonitorsList();
+            };
+            timer.Start();
         }
 
         private void RegisterHotkeys()
@@ -150,9 +249,21 @@ namespace JL_Monitor_Brightness
             
             if (monitors.Count > 0)
             {
-                // Устанавливаем текущий монитор
-                _currentMonitorIndex = Math.Min(_settings.DefaultMonitorIndex, monitors.Count - 1);
-                _currentMonitor = monitors[_currentMonitorIndex];
+                // Монитор по умолчанию берём из настроек, а не всегда первый.
+                // Индекс проверяем: мониторы отключают, и сохранённый может выйти за границы.
+                int index = _settings.DefaultMonitorIndex;
+                if (index < 0 || index >= monitors.Count)
+                {
+                    index = 0;
+                }
+
+                _currentMonitor = monitors[index];
+                _trayService.SetSelectedMonitor(index);
+
+                if (_brightnessOverlay != null)
+                {
+                    _brightnessOverlay.MonitorCount = monitors.Count;
+                }
                 
                 // Обновляем список мониторов в трее
                 _trayService.UpdateMonitorsList();
@@ -172,9 +283,20 @@ namespace JL_Monitor_Brightness
 
         private void ShowSettings()
         {
-            // Если окно уже открыто, просто активируем его
+            // Окно с включённой галочкой «сворачивать в трей» не закрывается, а прячется —
+            // поэтому недостаточно Activate(), нужно и Show() для скрытого.
             if (_mainWindow != null)
             {
+                if (!_mainWindow.IsVisible)
+                {
+                    _mainWindow.Show();
+                }
+
+                if (_mainWindow.WindowState == WindowState.Minimized)
+                {
+                    _mainWindow.WindowState = WindowState.Normal;
+                }
+
                 _mainWindow.Activate();
                 return;
             }
@@ -185,11 +307,24 @@ namespace JL_Monitor_Brightness
             {
                 _mainWindow = null;
                 
-                // После закрытия окна обновляем горячие клавиши и настройки
+                // После закрытия окна обновляем горячие клавиши и настройки.
+                // ⚠️ Раньше здесь создавался новый BrightnessOverlay, а старый не закрывался:
+                // окно оставалось в Application.Windows вместе с таймером и подписками,
+                // и каждый заход в настройки добавлял по висящему окну.
                 RegisterHotkeys();
-                _brightnessOverlay = new BrightnessOverlay(_monitorService, _settings);
+                _brightnessOverlay?.ApplySettings();
             };
             
+            _mainWindow.IsVisibleChanged += (s, e) =>
+            {
+                // Окно спрятали в трей — момент применить настройки, закрытия ведь не будет.
+                if (_mainWindow != null && !_mainWindow.IsVisible)
+                {
+                    RegisterHotkeys();
+                    _brightnessOverlay?.ApplySettings();
+                }
+            };
+
             _mainWindow.Show();
             _mainWindow.Activate();
         }
@@ -219,8 +354,15 @@ namespace JL_Monitor_Brightness
                     return;
                 }
                 
+                // Пользователь мог попросить не напоминать про конкретную версию.
+                // При ручной проверке (showNoUpdatesMessage) пропуск игнорируем — он сам спросил.
+                bool skipped = !showNoUpdatesMessage
+                    && !string.IsNullOrEmpty(_settings.SkippedVersion)
+                    && string.Equals(_settings.SkippedVersion, updateInfo.LatestVersion,
+                                     StringComparison.OrdinalIgnoreCase);
+
                 // Если есть новая версия
-                if (_updateService.IsUpdateAvailable(updateInfo, _settings.CurrentVersion))
+                if (!skipped && _updateService.IsUpdateAvailable(updateInfo, _settings.CurrentVersion))
                 {
                     // Показываем окно обновления
                     var updateWindow = new UpdateWindow(updateInfo, _settings, _updateService);
@@ -279,6 +421,8 @@ namespace JL_Monitor_Brightness
 
         private void TrayService_ExitRequested(object sender, EventArgs e)
         {
+            // Иначе OnClosing окна настроек перехватит закрытие и снова спрячет его в трей.
+            _mainWindow?.CloseForReal();
             Shutdown();
         }
 
@@ -287,7 +431,6 @@ namespace JL_Monitor_Brightness
             var monitors = _monitorService.GetMonitors();
             if (monitors.Count > e)
             {
-                _currentMonitorIndex = e;
                 _currentMonitor = monitors[e];
                 _settings.DefaultMonitorIndex = e;
                 _settings.SaveSettings();

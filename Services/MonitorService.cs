@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace JL_Monitor_Brightness.Services
 {
-    public class MonitorService
+    public class MonitorService : IDisposable
     {
         // Win32 API для работы с физическими мониторами
         [DllImport("dxva2.dll", EntryPoint = "GetNumberOfPhysicalMonitorsFromHMONITOR")]
@@ -28,9 +28,6 @@ namespace JL_Monitor_Brightness.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DestroyPhysicalMonitor(IntPtr hMonitor);
 
-        [DllImport("dxva2.dll", EntryPoint = "DestroyPhysicalMonitors")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DestroyPhysicalMonitors(uint dwPhysicalMonitorArraySize, [In] PHYSICAL_MONITOR[] pPhysicalMonitorArray);
 
         [DllImport("user32.dll")]
         private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
@@ -58,9 +55,13 @@ namespace JL_Monitor_Brightness.Services
 
         public List<PhysicalMonitorInfo> GetMonitors()
         {
-            _monitors.Clear();
+            // ⚠️ Именно ReleaseMonitors, а не Clear: хендлы от GetPhysicalMonitorsFromHMONITOR
+            // обязан освобождать вызывающий, иначе пул драйвера утекает при каждом обновлении.
+            ReleaseMonitors();
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorEnum, IntPtr.Zero);
-            return _monitors;
+            // Копия, а не внутренний список: иначе следующий вызов очистит список
+            // прямо под руками у того, кто держит ссылку.
+            return new List<PhysicalMonitorInfo>(_monitors);
         }
 
         private bool MonitorEnum(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData)
@@ -90,6 +91,13 @@ namespace JL_Monitor_Brightness.Services
                                 Index = _monitors.Count
                             });
                         }
+                        else
+                        {
+                            // Монитор без поддержки DDC/CI (обычно встроенная матрица ноутбука).
+                            // Хендл всё равно выделен — если его не отдать здесь, он утечёт
+                            // навсегда: в список он не попадает, и ReleaseMonitors его не увидит.
+                            DestroyPhysicalMonitor(monitor.hPhysicalMonitor);
+                        }
                     }
                 }
             }
@@ -118,7 +126,10 @@ namespace JL_Monitor_Brightness.Services
 
         public bool DecreaseBrightness(PhysicalMonitorInfo monitor, uint decrement = 10)
         {
-            uint newBrightness = Math.Max(monitor.CurrentBrightness - decrement, monitor.MinBrightness);
+            // ⚠️ Без ограничения шага 5u - 10u даёт 4294967291 (uint не уходит в минус),
+            // Math.Max выбирает это значение, и яркость молча перестаёт убавляться.
+            uint step = Math.Min(decrement, monitor.CurrentBrightness);
+            uint newBrightness = Math.Max(monitor.CurrentBrightness - step, monitor.MinBrightness);
             return SetBrightness(monitor, newBrightness);
         }
 
@@ -130,6 +141,18 @@ namespace JL_Monitor_Brightness.Services
             }
             _monitors.Clear();
         }
+
+        public void Dispose()
+        {
+            ReleaseMonitors();
+            GC.SuppressFinalize(this);
+        }
+
+        ~MonitorService()
+        {
+            // Страховка: если Dispose забыли, хендлы всё равно вернутся драйверу.
+            ReleaseMonitors();
+        }
     }
 
     public class PhysicalMonitorInfo
@@ -140,7 +163,11 @@ namespace JL_Monitor_Brightness.Services
         public uint CurrentBrightness { get; set; }
         public uint MaxBrightness { get; set; }
         public int Index { get; set; }
-        public int BrightnessPercentage => (int)((CurrentBrightness - MinBrightness) * 100 / (MaxBrightness - MinBrightness));
+        // ⚠️ Виртуальные дисплеи и часть KVM отвечают Min == Max. Без проверки это
+        // DivideByZeroException прямо в обработчике горячей клавиши, то есть падение программы.
+        public int BrightnessPercentage => MaxBrightness > MinBrightness
+            ? (int)((CurrentBrightness - MinBrightness) * 100 / (MaxBrightness - MinBrightness))
+            : 0;
 
         public override string ToString()
         {

@@ -146,23 +146,37 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        private const string RunKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        private const string RunValueName = "JL-Monitor-Brightness";
+        private const string StartupArgument = "/minimized";
+
         private void UpdateStartupRegistry()
         {
             try
             {
-                RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                
+                using RegistryKey rk = Registry.CurrentUser.OpenSubKey(RunKeyPath, true);
+                if (rk == null)
+                {
+                    return;
+                }
+
                 if (_settings.StartWithWindows)
                 {
-                    string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    rk.SetValue("JL-Monitor-Brightness", appPath);
-                }
-                else
-                {
-                    if (rk.GetValue("JL-Monitor-Brightness") != null)
+                    // Assembly.Location в .NET 6 указывает на управляемую .dll (а в single-file
+                    // публикации вообще пуст) — Windows такой путь не запускает. Нужен apphost.
+                    string appPath = Environment.ProcessPath;
+                    if (string.IsNullOrEmpty(appPath))
                     {
-                        rk.DeleteValue("JL-Monitor-Brightness", false);
+                        return;
                     }
+
+                    // Путь установки содержит пробелы, поэтому кавычки обязательны:
+                    // иначе аргумент склеится с путём и разбор командной строки сломается.
+                    rk.SetValue(RunValueName, $"\"{appPath}\" {StartupArgument}");
+                }
+                else if (rk.GetValue(RunValueName) != null)
+                {
+                    rk.DeleteValue(RunValueName, false);
                 }
             }
             catch (Exception ex)
@@ -177,6 +191,31 @@ namespace JL_Monitor_Brightness
             if (_isInitializing) return;
             // Нет необходимости делать что-то здесь, настройка будет сохранена при нажатии кнопки "Сохранить"
         }
+
+        /// <summary>
+        /// Закрытие окна при включённой галочке прячет его в трей, а не выгружает.
+        /// Раньше настройка MinimizeToTray не читалась нигде — галочка не делала ничего.
+        /// </summary>
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (_settings != null && _settings.MinimizeToTray && !_closingToExit)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
+
+            base.OnClosing(e);
+        }
+
+        /// <summary>Закрыть окно по-настоящему, минуя сворачивание в трей.</summary>
+        public void CloseForReal()
+        {
+            _closingToExit = true;
+            Close();
+        }
+
+        private bool _closingToExit;
 
         private void MinimizeToTrayCheckBox_Changed(object sender, RoutedEventArgs e)
         {
@@ -245,7 +284,10 @@ namespace JL_Monitor_Brightness
             
             // Получаем модификаторы и клавишу
             _currentModifiers = Keyboard.Modifiers;
-            _currentKey = e.Key;
+            // При зажатом Alt WPF кладёт в e.Key значение Key.System,
+            // а настоящую клавишу — в e.SystemKey. Без этого ни одну
+            // комбинацию с Alt назначить нельзя.
+            _currentKey = e.Key == Key.System ? e.SystemKey : e.Key;
             
             // Игнорируем сами модификаторы как ключевые клавиши
             if (_currentKey == Key.LeftCtrl || _currentKey == Key.RightCtrl ||
@@ -255,12 +297,6 @@ namespace JL_Monitor_Brightness
                 _currentKey == Key.System)
             {
                 return;
-            }
-
-            // Для клавиш с модификатором System (например, Alt+Tab) используем реальный код клавиши
-            if (_currentKey == Key.Tab && (_currentModifiers & ModifierKeys.Alt) == ModifierKeys.Alt)
-            {
-                _currentKey = Key.Tab;
             }
             
             // Требуем хотя бы один модификатор
@@ -312,8 +348,9 @@ namespace JL_Monitor_Brightness
             {
                 try
                 {
-                    // Сначала удаляем старую горячую клавишу
-                    try { _hotkeyService.UnregisterHotkeys(); } catch { }
+                    // ⚠️ Раньше здесь снимались ВСЕ три комбинации, а регистрировалась
+                    // обратно только редактируемая: пока открыты настройки, две другие
+                    // были мертвы. UpdateHotkey сам делает Remove нужной перед AddOrReplace.
                     
                     // Регистрируем новую горячую клавишу
                     bool success = _hotkeyService.UpdateHotkey(hotkeyName, _currentKey, _currentModifiers);

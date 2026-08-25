@@ -1,0 +1,40 @@
+name: Сборка
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # WPF собирается только под Windows — это единственный способ проверить,
+    # что код вообще компилируется.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Поставить .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Восстановить зависимости
+        run: dotnet restore
+
+      - name: Собрать
+        run: dotnet build --configuration Release --no-restore /warnaserror:CS0168,CS0219
+
+      - name: Портативная сборка (один файл)
+        run: >
+          dotnet publish -c Release -r win-x64 --self-contained false
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/portable
+
+      - name: Сохранить результат
+        uses: actions/upload-artifact@v4
+        with:
+          name: JL-Monitor-Brightness-portable
+          path: publish/portable/*.exe
+          retention-days: 14

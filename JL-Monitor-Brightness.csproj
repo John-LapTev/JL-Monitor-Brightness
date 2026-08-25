@@ -2,16 +2,32 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>JL_Monitor_Brightness</RootNamespace>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\Icons\brightness.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <Authors>JL</Authors>
     <Product>JL Monitor Brightness</Product>
     <Description>Утилита для регулировки яркости внешних мониторов</Description>
-    <Copyright>© 2025</Copyright>
-    <Version>1.0.0</Version>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Copyright>© 2026</Copyright>
+
+    <!-- Единственный источник версии. Раньше она была продублирована в трёх местах
+         (csproj, Settings.cs, .iss) и при этом не попадала в сборку вовсе,
+         потому что стоял GenerateAssemblyInfo=false. -->
+    <Version>1.1.0</Version>
+
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- Портативная сборка: один файл, настройки лежат рядом с ним.
+       dotnet publish -c Release -p:PublishProfile=Portable -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <SelfContained>false</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

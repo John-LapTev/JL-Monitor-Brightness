@@ -13,6 +13,7 @@ namespace JL_Monitor_Brightness.Services
         private MenuItem _increaseMenuItem;
         private MenuItem _decreaseMenuItem;
         private MenuItem _monitorsMenuItem;
+        private int _selectedMonitorIndex;
 
         public event EventHandler OpenSettingsRequested;
         public event EventHandler ExitRequested;
@@ -138,17 +139,43 @@ namespace JL_Monitor_Brightness.Services
                         item.IsChecked = false;
                     }
                     monitorMenuItem.IsChecked = true;
+                    _selectedMonitorIndex = index;
                     MonitorSelected?.Invoke(this, index);
                 };
                 
                 _monitorsMenuItem.Items.Add(monitorMenuItem);
             }
             
-            // Если есть хотя бы один монитор, выбираем первый по умолчанию
+            // Отмечаем тот монитор, которым программа управляет на самом деле.
+            // Раньше галочка всегда стояла на первом, и меню показывало не тот монитор.
             if (_monitorsMenuItem.Items.Count > 0)
             {
-                ((MenuItem)_monitorsMenuItem.Items[0]).IsChecked = true;
+                int selected = _selectedMonitorIndex;
+                if (selected < 0 || selected >= _monitorsMenuItem.Items.Count)
+                {
+                    selected = 0;
+                }
+
+                ((MenuItem)_monitorsMenuItem.Items[selected]).IsChecked = true;
             }
+        }
+
+        /// <summary>Сообщает трею, каким монитором сейчас управляют, чтобы галочка не врала.</summary>
+        public void SetSelectedMonitor(int index)
+        {
+            _selectedMonitorIndex = index;
+
+            if (_monitorsMenuItem == null || index < 0 || index >= _monitorsMenuItem.Items.Count)
+            {
+                return;
+            }
+
+            foreach (MenuItem item in _monitorsMenuItem.Items)
+            {
+                item.IsChecked = false;
+            }
+
+            ((MenuItem)_monitorsMenuItem.Items[index]).IsChecked = true;
         }
 
         public void ShowNotification(string title, string message, BalloonIcon icon = BalloonIcon.Info)

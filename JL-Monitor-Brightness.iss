@@ -1,5 +1,5 @@
-#define MyAppName "JL Monitor Brightness"
-#define MyAppVersion "1.0.0"
+﻿#define MyAppName "JL Monitor Brightness"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "JL Studio"
 #define MyAppURL "https://jl-studio.art/"
 #define MyAppExeName "JL-Monitor-Brightness.exe"
@@ -29,9 +29,15 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 
+[Registry]
+; Запись автозапуска должна исчезать вместе с программой, иначе в Run остаётся
+; путь к удалённому файлу.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
+  ValueType: none; ValueName: "JL-Monitor-Brightness"; Flags: uninsdeletevalue
+
 [Files]
-Source: "JL-Monitor-Brightness\bin\Release\net6.0-windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "JL-Monitor-Brightness\bin\Release\net6.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "bin\Release\net8.0-windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

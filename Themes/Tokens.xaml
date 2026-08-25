@@ -1,0 +1,57 @@
+<!--
+  Токены оформления. Один источник цветов, радиусов, теней и шрифта.
+  Раньше App.xaml был пуст, и все окна брали тему Aero2 — язык Windows 7.
+
+  Шрифт: Segoe UI Variable (Windows 11) с откатом на Segoe UI. Inter не берём —
+  WPF не читает woff2, а variable-начертания игнорирует, пришлось бы класть в
+  репозиторий три ttf ради почти того же рисунка.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+  <!-- Текст -->
+  <SolidColorBrush x:Key="Ink"  Color="#1A1A1F" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Ink2" Color="#43434B" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Ink3" Color="#6B6B75" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Ink4" Color="#9A9AA3" po:Freeze="True"/>
+
+  <!-- Поверхности -->
+  <SolidColorBrush x:Key="Bg"    Color="#F6F7FB" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Card"  Color="#FFFFFF" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Glass" Color="#E8FFFFFF" po:Freeze="True"/>
+
+  <!-- Линии -->
+  <SolidColorBrush x:Key="Hairline"       Color="#14141626" po:Freeze="True"/>
+  <SolidColorBrush x:Key="HairlineStrong" Color="#26141626" po:Freeze="True"/>
+  <SolidColorBrush x:Key="Hover"          Color="#0D141626" po:Freeze="True"/>
+  <SolidColorBrush x:Key="TrackBg"        Color="#1A141626" po:Freeze="True"/>
+
+  <!-- Акцент. Значение подменяется в рантайме из настроек, поэтому обращаться
+       к нему через DynamicResource. Живёт в ресурсах приложения, а не окна:
+       иначе смена темы не доходит до остальных окон. -->
+  <SolidColorBrush x:Key="PrimaryBrush" Color="#7C82F4"/>
+
+  <LinearGradientBrush x:Key="AccGradient" StartPoint="0,0" EndPoint="1,0" po:Freeze="True">
+    <GradientStop Color="#A78BFA" Offset="0"/>
+    <GradientStop Color="#60A5FA" Offset="1"/>
+  </LinearGradientBrush>
+
+  <!-- Шрифт и кегли -->
+  <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI, Arial</FontFamily>
+  <FontFamily x:Key="UiFontDisplay">Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
+  <sys:Double x:Key="FsCaption">11</sys:Double>
+  <sys:Double x:Key="FsSmall"  >12.5</sys:Double>
+  <sys:Double x:Key="FsBase"   >13</sys:Double>
+  <sys:Double x:Key="FsLarge"  >15</sys:Double>
+  <sys:Double x:Key="FsTitle"  >17</sys:Double>
+
+  <!-- Радиусы -->
+  <CornerRadius x:Key="RSm">8</CornerRadius>
+  <CornerRadius x:Key="RMd">10</CornerRadius>
+  <CornerRadius x:Key="RLg">14</CornerRadius>
+  <CornerRadius x:Key="RXl">20</CornerRadius>
+  <CornerRadius x:Key="RPill">26</CornerRadius>
+
+</ResourceDictionary>

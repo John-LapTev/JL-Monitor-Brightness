@@ -398,3 +398,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# рабочие заметки по доработке, не для репозитория
+.план/

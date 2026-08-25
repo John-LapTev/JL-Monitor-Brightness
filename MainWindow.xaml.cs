@@ -65,7 +65,7 @@ namespace JL_Monitor_Brightness
                 if (item.Tag.ToString() == _settings.ThemeColor)
                 {
                     ThemeColorComboBox.SelectedItem = item;
-                    ColorPreviewRectangle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_settings.ThemeColor));
+                    ColorPreviewRectangle.Fill = _settings.CreateThemeBrush();
                     break;
                 }
             }
@@ -95,6 +95,24 @@ namespace JL_Monitor_Brightness
                     Tag = i
                 });
             }
+
+            // Пустой список без объяснения выглядит как поломка. Говорим прямо,
+            // что мониторов нет и почему — замечание тестировщика 25.08.2026.
+            if (monitors.Count == 0)
+            {
+                DefaultMonitorComboBox.Items.Add(new ComboBoxItem
+                {
+                    Content = "Мониторы с DDC/CI не найдены",
+                    IsEnabled = false,
+                });
+                DefaultMonitorComboBox.SelectedIndex = 0;
+                DefaultMonitorComboBox.ToolTip =
+                    "Программа управляет только внешними мониторами с поддержкой DDC/CI. " +
+                    "Встроенный экран ноутбука регулируется его собственными клавишами.";
+                return;
+            }
+
+            DefaultMonitorComboBox.ToolTip = null;
             
             if (DefaultMonitorComboBox.Items.Count > _settings.DefaultMonitorIndex)
             {
@@ -146,23 +164,37 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        private const string RunKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        private const string RunValueName = "JL-Monitor-Brightness";
+        private const string StartupArgument = "/minimized";
+
         private void UpdateStartupRegistry()
         {
             try
             {
-                RegistryKey rk = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                
+                using RegistryKey rk = Registry.CurrentUser.OpenSubKey(RunKeyPath, true);
+                if (rk == null)
+                {
+                    return;
+                }
+
                 if (_settings.StartWithWindows)
                 {
-                    string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    rk.SetValue("JL-Monitor-Brightness", appPath);
-                }
-                else
-                {
-                    if (rk.GetValue("JL-Monitor-Brightness") != null)
+                    // Assembly.Location в .NET 6 указывает на управляемую .dll (а в single-file
+                    // публикации вообще пуст) — Windows такой путь не запускает. Нужен apphost.
+                    string appPath = Environment.ProcessPath;
+                    if (string.IsNullOrEmpty(appPath))
                     {
-                        rk.DeleteValue("JL-Monitor-Brightness", false);
+                        return;
                     }
+
+                    // Путь установки содержит пробелы, поэтому кавычки обязательны:
+                    // иначе аргумент склеится с путём и разбор командной строки сломается.
+                    rk.SetValue(RunValueName, $"\"{appPath}\" {StartupArgument}");
+                }
+                else if (rk.GetValue(RunValueName) != null)
+                {
+                    rk.DeleteValue(RunValueName, false);
                 }
             }
             catch (Exception ex)
@@ -171,12 +203,140 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        /// <summary>
+        /// Появление содержимого при смене вкладки.
+        ///
+        /// ⛔ Раньше это делал EventTrigger прямо в шаблоне TabControl — и приложение
+        /// не запускалось вовсе: Selector.SelectionChanged поднимает любой ComboBox
+        /// внутри вкладки, событие всплывает до TabControl, триггер ловит чужое и падает
+        /// с «Не удаётся найти имя Content». Здесь источник проверяется явно.
+        /// </summary>
+        private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Событие всплывает от вложенных списков — берём только своё.
+            if (!ReferenceEquals(e.OriginalSource, Tabs))
+            {
+                return;
+            }
+
+            if (Tabs.SelectedContent is not UIElement content)
+            {
+                return;
+            }
+
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1,
+                TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+                },
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+            };
+            content.BeginAnimation(OpacityProperty, fade);
+        }
+
+        /// <summary>
+        /// Двойной клик по ползунку возвращает значение по умолчанию.
+        /// Просьба тестировщика 25.08.2026 — привычка из программ со звуком, где так
+        /// сбрасывают любую ручку. Значение лежит в Tag рядом с самим ползунком,
+        /// чтобы не держать вторую таблицу умолчаний в коде.
+        /// </summary>
+        private void Slider_ResetToDefault(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is not Slider slider || slider.Tag is not string текст)
+            {
+                return;
+            }
+
+            if (double.TryParse(текст, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out double значение))
+            {
+                slider.Value = значение;
+                e.Handled = true;
+            }
+        }
+
+        #region Окно без системной рамки
+
+        /// <summary>
+        /// Появление окна: всплывает с лёгким увеличением за 0.22 с.
+        /// Кривая та же, что у регулятора — движение резко стартует и мягко доезжает.
+        /// </summary>
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            var spline = new System.Windows.Media.Animation.KeySpline(0.22, 1, 0.36, 1);
+
+            this.Opacity = 0;
+            var fade = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames();
+            fade.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(1,
+                System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), spline));
+            this.BeginAnimation(OpacityProperty, fade);
+
+            foreach (var prop in new[] { System.Windows.Media.ScaleTransform.ScaleXProperty,
+                                         System.Windows.Media.ScaleTransform.ScaleYProperty })
+            {
+                var scale = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames();
+                scale.KeyFrames.Add(new System.Windows.Media.Animation.SplineDoubleKeyFrame(1,
+                    System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(240)), spline));
+                WindowScale.BeginAnimation(prop, scale);
+            }
+        }
+
+        // WindowStyle=None убирает системную рамку — перетаскивание делаем сами.
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 1)
+            {
+                try { DragMove(); } catch { /* окно уже закрывается */ }
+            }
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void CloseWindow_Click(object sender, RoutedEventArgs e)
+        {
+            // Close(), а не CloseForReal(): при включённой галочке окно должно уйти
+            // в трей — крестик здесь ведёт себя как системный.
+            Close();
+        }
+
+        #endregion
+
         #region Event Handlers
         private void StartWithWindowsCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             if (_isInitializing) return;
             // Нет необходимости делать что-то здесь, настройка будет сохранена при нажатии кнопки "Сохранить"
         }
+
+        /// <summary>
+        /// Закрытие окна при включённой галочке прячет его в трей, а не выгружает.
+        /// Раньше настройка MinimizeToTray не читалась нигде — галочка не делала ничего.
+        /// </summary>
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (_settings != null && _settings.MinimizeToTray && !_closingToExit)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
+
+            base.OnClosing(e);
+        }
+
+        /// <summary>Закрыть окно по-настоящему, минуя сворачивание в трей.</summary>
+        public void CloseForReal()
+        {
+            _closingToExit = true;
+            Close();
+        }
+
+        private bool _closingToExit;
 
         private void MinimizeToTrayCheckBox_Changed(object sender, RoutedEventArgs e)
         {
@@ -245,7 +405,10 @@ namespace JL_Monitor_Brightness
             
             // Получаем модификаторы и клавишу
             _currentModifiers = Keyboard.Modifiers;
-            _currentKey = e.Key;
+            // При зажатом Alt WPF кладёт в e.Key значение Key.System,
+            // а настоящую клавишу — в e.SystemKey. Без этого ни одну
+            // комбинацию с Alt назначить нельзя.
+            _currentKey = e.Key == Key.System ? e.SystemKey : e.Key;
             
             // Игнорируем сами модификаторы как ключевые клавиши
             if (_currentKey == Key.LeftCtrl || _currentKey == Key.RightCtrl ||
@@ -255,12 +418,6 @@ namespace JL_Monitor_Brightness
                 _currentKey == Key.System)
             {
                 return;
-            }
-
-            // Для клавиш с модификатором System (например, Alt+Tab) используем реальный код клавиши
-            if (_currentKey == Key.Tab && (_currentModifiers & ModifierKeys.Alt) == ModifierKeys.Alt)
-            {
-                _currentKey = Key.Tab;
             }
             
             // Требуем хотя бы один модификатор
@@ -312,8 +469,9 @@ namespace JL_Monitor_Brightness
             {
                 try
                 {
-                    // Сначала удаляем старую горячую клавишу
-                    try { _hotkeyService.UnregisterHotkeys(); } catch { }
+                    // ⚠️ Раньше здесь снимались ВСЕ три комбинации, а регистрировалась
+                    // обратно только редактируемая: пока открыты настройки, две другие
+                    // были мертвы. UpdateHotkey сам делает Remove нужной перед AddOrReplace.
                     
                     // Регистрируем новую горячую клавишу
                     bool success = _hotkeyService.UpdateHotkey(hotkeyName, _currentKey, _currentModifiers);
@@ -386,8 +544,9 @@ namespace JL_Monitor_Brightness
         {
             if (_isInitializing) return;
             
-            int value = (int)e.NewValue;
-            TimeoutTextBlock.Text = $"{value} сек";
+            int ms = (int)e.NewValue;
+            // Слайдер задаёт миллисекунды, а человеку понятнее секунды с десятыми.
+            TimeoutTextBlock.Text = (ms / 1000.0).ToString("0.0", System.Globalization.CultureInfo.CurrentCulture) + " с";
         }
 
         private void ShowPercentageCheckBox_Changed(object sender, RoutedEventArgs e)

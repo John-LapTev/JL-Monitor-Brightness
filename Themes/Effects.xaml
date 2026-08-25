@@ -1,0 +1,20 @@
+<!--
+  Тени. DropShadowEffect — единственный штатный путь в WPF; многослойную тень
+  одним эффектом не собрать, поэтому при необходимости вкладываются два Border.
+  BlurRadius держим не больше 44: эффект растрирует элемент, и на больших
+  значениях это заметно бьёт по отрисовке.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
+
+  <DropShadowEffect x:Key="Shadow1" Color="#141626" BlurRadius="16" ShadowDepth="3"
+                    Direction="270" Opacity="0.07" RenderingBias="Quality" po:Freeze="True"/>
+
+  <DropShadowEffect x:Key="Shadow2" Color="#141626" BlurRadius="28" ShadowDepth="7"
+                    Direction="270" Opacity="0.10" RenderingBias="Quality" po:Freeze="True"/>
+
+  <DropShadowEffect x:Key="Shadow3" Color="#141626" BlurRadius="40" ShadowDepth="12"
+                    Direction="270" Opacity="0.14" RenderingBias="Quality" po:Freeze="True"/>
+
+</ResourceDictionary>

@@ -12,6 +12,8 @@ namespace JL_Monitor_Brightness
     public partial class BrightnessOverlay : Window
     {
         private readonly DispatcherTimer _hideTimer;
+        private readonly DispatcherTimer _writeTimer;
+        private uint? _pendingBrightness;
         private readonly MonitorService _monitorService;
         private PhysicalMonitorInfo _currentMonitor;
         private Settings _settings;
@@ -30,6 +32,9 @@ namespace JL_Monitor_Brightness
                 Interval = TimeSpan.FromMilliseconds(_settings.OverlayTimeout)
             };
             _hideTimer.Tick += HideTimer_Tick;
+
+            _writeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
+            _writeTimer.Tick += WriteTimer_Tick;
             
             // Применить настройки
             ApplySettings();
@@ -41,29 +46,28 @@ namespace JL_Monitor_Brightness
             this.KeyDown += BrightnessOverlay_KeyDown;
         }
 
-        private void ApplySettings()
+        /// <summary>Применяет настройки к оверлею. Публичный, чтобы окно не пересоздавать.</summary>
+        public void ApplySettings()
         {
-            this.Opacity = _settings.OverlayOpacity;
-            
-            // Применяем цветовую тему
-            var primaryBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_settings.ThemeColor));
-            this.Resources["PrimaryBrush"] = primaryBrush;
+            // ⚠️ Прозрачность окна больше не берётся из настроек: стекло делает
+            // системное размытие, а Opacity на всём окне гасило бы и его, и текст.
+            // Настройка остаётся в файле для совместимости, но на вид не влияет.
+            this.Opacity = 1.0;
+
+            // Акцент кладётся в ресурсы ПРИЛОЖЕНИЯ, а не окна: иначе смена темы
+            // не доходит до остальных окон, а в дизайнере DynamicResource даёт null.
+            Application.Current.Resources["PrimaryBrush"] = _settings.CreateThemeBrush();
+
+            if (_hideTimer != null)
+            {
+                _hideTimer.Interval = TimeSpan.FromMilliseconds(_settings.OverlayTimeout);
+            }
         }
 
         private void BrightnessOverlay_Loaded(object sender, RoutedEventArgs e)
         {
-            // Позиционирование окна в центре экрана
-            var screenWidth = SystemParameters.PrimaryScreenWidth;
-            var screenHeight = SystemParameters.PrimaryScreenHeight;
-            this.Left = (screenWidth - this.Width) / 2;
-            this.Top = screenHeight - this.Height - 100; // Размещаем ближе к нижней части экрана
-            
-            // Анимация появления
-            this.Opacity = 0;
-            var animation = new DoubleAnimation(0, _settings.OverlayOpacity, TimeSpan.FromMilliseconds(250));
-            this.BeginAnimation(OpacityProperty, animation);
-            
-            // Запускаем таймер скрытия
+            PositionOnActiveScreen();
+            PlayRevealAnimation();
             StartHideTimer();
         }
 
@@ -96,6 +100,51 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        /// <summary>
+        /// Появление: прозрачность, лёгкий подъём и доводка масштаба.
+        /// Кривая KeySpline 0.22,1 0.36,1 — точный перенос cubic-bezier из
+        /// дизайн-системы: движение резко стартует и мягко доезжает.
+        /// </summary>
+        /// <summary>
+        /// Возвращает пилюлю в исходное состояние. Без этого анимация появления
+        /// отработает ровно один раз за запуск: значения остаются под управлением
+        /// прошлого Storyboard.
+        /// </summary>
+        private void ResetRevealState()
+        {
+            PillSlide.BeginAnimation(TranslateTransform.YProperty, null);
+            PillScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            PillScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
+            PillSlide.Y = 8;
+            PillScale.ScaleX = 0.96;
+            PillScale.ScaleY = 0.96;
+        }
+
+        private void PlayRevealAnimation()
+        {
+            var spline = new KeySpline(0.22, 1, 0.36, 1);
+
+            this.Opacity = 0;
+            var fade = new DoubleAnimationUsingKeyFrames();
+            fade.KeyFrames.Add(new SplineDoubleKeyFrame(1.0,
+                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), spline));
+            this.BeginAnimation(OpacityProperty, fade);
+
+            var slide = new DoubleAnimationUsingKeyFrames();
+            slide.KeyFrames.Add(new SplineDoubleKeyFrame(0,
+                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)), spline));
+            PillSlide.BeginAnimation(TranslateTransform.YProperty, slide);
+
+            foreach (var prop in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty })
+            {
+                var scale = new DoubleAnimationUsingKeyFrames();
+                scale.KeyFrames.Add(new SplineDoubleKeyFrame(1,
+                    KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)), spline));
+                PillScale.BeginAnimation(prop, scale);
+            }
+        }
+
         private void StartHideTimer()
         {
             _hideTimer.Start();
@@ -105,16 +154,41 @@ namespace JL_Monitor_Brightness
         {
             _hideTimer.Stop();
             
-            // Анимация скрытия
-            var animation = new DoubleAnimation(_settings.OverlayOpacity, 0, TimeSpan.FromMilliseconds(250));
-            animation.Completed += (s, args) => Hide();
-            this.BeginAnimation(OpacityProperty, animation);
+            // Уход быстрее появления: 160 мс, лёгкий уезд вниз.
+            var fade = new DoubleAnimation(1.0, 0, TimeSpan.FromMilliseconds(160))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            fade.Completed += (s, args) =>
+            {
+                Hide();
+                ResetRevealState();
+            };
+            this.BeginAnimation(OpacityProperty, fade);
+
+            var slide = new DoubleAnimation(0, 6, TimeSpan.FromMilliseconds(160))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            PillSlide.BeginAnimation(TranslateTransform.YProperty, slide);
         }
+
+        /// <summary>
+        /// Сколько мониторов известно приложению. Ставится снаружи при обновлении
+        /// списка: перечислять DDC/CI на каждый показ оверлея слишком дорого.
+        /// </summary>
+        public int MonitorCount { get; set; } = 1;
 
         public void SetMonitor(PhysicalMonitorInfo monitor)
         {
             _currentMonitor = monitor;
+
+            // Подпись нужна, только когда есть из чего выбирать: на одном мониторе
+            // она сообщает очевидное и занимает место.
             MonitorNameTextBlock.Text = monitor.Description;
+            MonitorNameTextBlock.Visibility = MonitorCount > 1
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             
             // Обновляем слайдер без вызова события изменения значения
             _isUpdatingSlider = true;
@@ -137,6 +211,207 @@ namespace JL_Monitor_Brightness
             }
         }
 
+        #region Позиционирование
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct POINT { public int X; public int Y; }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct RECT { public int left, top, right, bottom; }
+
+        // ── Настоящее размытие фона ──────────────────────────────────────────────
+        // Мнение, что прозрачное окно WPF не может размывать фон, верно только для
+        // DwmSetWindowAttribute (Mica/Acrylic из Windows 11). Недокументированный
+        // SetWindowCompositionAttribute работает и с layered-окном — этим приёмом
+        // сделано стекло в большинстве WPF-приложений начиная с Windows 10 1803.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct WindowCompositionAttributeData
+        {
+            public int Attribute;
+            public IntPtr Data;
+            public int SizeOfData;
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct AccentPolicy
+        {
+            public int AccentState;
+            public int AccentFlags;
+            public int GradientColor;
+            public int AnimationId;
+        }
+
+        private const int WCA_ACCENT_POLICY = 19;
+        private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+        private const int ACCENT_ENABLE_BLURBEHIND = 3;
+
+        /// <summary>
+        /// Включает размытие того, что находится ЗА окном. Без него прозрачная пилюля
+        /// показывала бы обои как есть, и текст скакал бы по контрасту в зависимости
+        /// от картинки под ним.
+        /// </summary>
+        private void EnableAcrylic(IntPtr handle)
+        {
+            // Цвет подложки в формате AABBGGRR (именно в таком порядке, не ARGB):
+            // светлая, слегка холодная, 40% — вместе с размытием даёт матовое стекло.
+            TryAccent(handle, ACCENT_ENABLE_ACRYLICBLURBEHIND, unchecked((int)0x66FBF9F7));
+        }
+
+        private static void TryAccent(IntPtr handle, int state, int color)
+        {
+            var accent = new AccentPolicy
+            {
+                AccentState = state,
+                AccentFlags = 2,   // рисовать все границы
+                GradientColor = color
+            };
+
+            int size = System.Runtime.InteropServices.Marshal.SizeOf(accent);
+            IntPtr ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+
+            try
+            {
+                System.Runtime.InteropServices.Marshal.StructureToPtr(accent, ptr, false);
+                var data = new WindowCompositionAttributeData
+                {
+                    Attribute = WCA_ACCENT_POLICY,
+                    SizeOfData = size,
+                    Data = ptr
+                };
+                SetWindowCompositionAttribute(handle, ref data);
+            }
+            catch
+            {
+                // API недокументированный: на будущих сборках Windows может исчезнуть.
+                // Тогда остаётся плотная заливка из разметки — вид хуже, но рабочий.
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FreeHGlobal(ptr);
+            }
+        }
+
+        private const int GWL_EXSTYLE = -20;
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+        private const int WS_EX_TOOLWINDOW = 0x00000080;
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Окно, которое нельзя активировать. Без этого WPF всё равно перехватывает
+            // фокус при показе, даже если не звать Activate().
+            var helper = new System.Windows.Interop.WindowInteropHelper(this);
+            int style = GetWindowLong(helper.Handle, GWL_EXSTYLE);
+            SetWindowLong(helper.Handle, GWL_EXSTYLE, style | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
+
+            EnableAcrylic(helper.Handle);
+        }
+
+        /// <summary>
+        /// Ставит оверлей на экран, где сейчас курсор, по нижнему краю рабочей области.
+        /// Раньше позиция считалась от PrimaryScreenWidth — то есть всегда на главном
+        /// мониторе, даже когда регулировали второй, а на разных DPI ещё и уезжала.
+        /// </summary>
+        private void PositionOnActiveScreen()
+        {
+            try
+            {
+                if (!GetCursorPos(out POINT cursor))
+                {
+                    FallbackPosition();
+                    return;
+                }
+
+                IntPtr hMonitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+                var info = new MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(MONITORINFO)) };
+
+                if (!GetMonitorInfo(hMonitor, ref info))
+                {
+                    FallbackPosition();
+                    return;
+                }
+
+                // Win32 отдаёт физические пиксели, WPF расставляет окна в единицах,
+                // независимых от устройства — без пересчёта на мониторе со 150%
+                // окно уедет ровно в полтора раза.
+                var dpi = VisualTreeHelper.GetDpi(this);
+                double left = info.rcWork.left / dpi.DpiScaleX;
+                double top = info.rcWork.top / dpi.DpiScaleY;
+                double width = (info.rcWork.right - info.rcWork.left) / dpi.DpiScaleX;
+                double height = (info.rcWork.bottom - info.rcWork.top) / dpi.DpiScaleY;
+
+                this.Left = left + (width - this.Width) / 2;
+                // Отступ пропорциональный, а не жёсткие 100 пикселей: на 1080p даст ~118,
+                // на 1440p ~156, и панель задач учтена, потому что берётся рабочая область.
+                this.Top = top + height - this.Height - height * 0.12;
+            }
+            catch
+            {
+                FallbackPosition();
+            }
+        }
+
+        private void FallbackPosition()
+        {
+            this.Left = (SystemParameters.PrimaryScreenWidth - this.Width) / 2;
+            this.Top = SystemParameters.PrimaryScreenHeight - this.Height - 100;
+        }
+
+        #endregion
+
+        private void WriteTimer_Tick(object sender, EventArgs e)
+        {
+            _writeTimer.Stop();
+
+            if (_pendingBrightness == null || _currentMonitor == null)
+            {
+                return;
+            }
+
+            uint value = _pendingBrightness.Value;
+            _pendingBrightness = null;
+
+            // Результат раньше отбрасывался во всех местах вызова: отказ DDC/CI
+            // (монитор выключен, кабель, DDC/CI выключен в меню монитора) выглядел
+            // для человека как «нажимаю, и ничего не происходит».
+            if (!_monitorService.SetBrightness(_currentMonitor, value))
+            {
+                BrightnessFailed?.Invoke(this, _currentMonitor);
+            }
+        }
+
+        /// <summary>Монитор не принял яркость — вызывающий решает, как сообщить.</summary>
+        public event EventHandler<PhysicalMonitorInfo> BrightnessFailed;
+
         private void BrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingSlider || _currentMonitor == null) return;
@@ -148,8 +423,16 @@ namespace JL_Monitor_Brightness
             uint brightness = (uint)(_currentMonitor.MinBrightness + 
                 (percentage / 100.0) * (_currentMonitor.MaxBrightness - _currentMonitor.MinBrightness));
             
-            _monitorService.SetBrightness(_currentMonitor, brightness);
-            
+            // ⚠️ DDC/CI — синхронный обмен по I2C, 20-80 мс на вызов. Раньше он шёл на
+            // КАЖДЫЙ тик перетаскивания прямо в UI-потоке: окно подвисало, а экранное
+            // меню монитора отставало на секунды. Теперь пишем не чаще раза в 60 мс,
+            // побеждает последнее значение.
+            _pendingBrightness = brightness;
+            if (!_writeTimer.IsEnabled)
+            {
+                _writeTimer.Start();
+            }
+
             // Сбрасываем таймер скрытия
             if (_hideTimer.IsEnabled)
             {
@@ -158,15 +441,30 @@ namespace JL_Monitor_Brightness
             }
         }
 
-        private void DecreaseButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Колесо мыши над пилюлей вместо прежних кнопок «плюс» и «минус»:
+        /// две кнопки 30×30 занимали треть ширины ради того, что удобнее делать колесом.
+        /// </summary>
+        private void Overlay_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            DecreaseBrightness();
+            if (_currentMonitor == null)
+            {
+                return;
+            }
+
+            if (e.Delta > 0)
+            {
+                IncreaseBrightness();
+            }
+            else if (e.Delta < 0)
+            {
+                DecreaseBrightness();
+            }
+
+            e.Handled = true;
         }
 
-        private void IncreaseButton_Click(object sender, RoutedEventArgs e)
-        {
-            IncreaseBrightness();
-        }
+
 
         private void DecreaseBrightness()
         {
@@ -217,22 +515,14 @@ namespace JL_Monitor_Brightness
             // Принудительно размещаем окно поверх всех окон
             this.Topmost = true;
             
-            // Показываем окно и делаем его активным
+            // ⚠️ Ни Activate(), ни Focus(): это OSD, а не окно. Раньше каждое нажатие
+            // горячей клавиши вырывало фокус из игры или из поля ввода.
             this.Show();
-            this.Activate();
-            this.Focus();
-            
-            // Обновляем расположение
+
             WindowState = WindowState.Normal;
-            var screenWidth = SystemParameters.PrimaryScreenWidth;
-            var screenHeight = SystemParameters.PrimaryScreenHeight;
-            this.Left = (screenWidth - this.Width) / 2;
-            this.Top = screenHeight - this.Height - 100;
+            PositionOnActiveScreen();
             
-            // Анимация появления с нуля
-            this.Opacity = 0;
-            var animation = new DoubleAnimation(0, _settings.OverlayOpacity, TimeSpan.FromMilliseconds(250));
-            this.BeginAnimation(OpacityProperty, animation);
+            PlayRevealAnimation();
             
             // Запускаем таймер скрытия
             StartHideTimer();

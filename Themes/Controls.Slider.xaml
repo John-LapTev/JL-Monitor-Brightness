@@ -1,0 +1,65 @@
+<!--
+  Слайдер яркости. Раньше был дефолтный Aero2: треугольный «флажок» на треке в
+  4 пикселя — контрол из 2006 года.
+
+  IsMoveToPointEnabled=True даёт поведение как в мобильных системах: тап по любой
+  точке трека сразу ставит значение, а не листает по странице.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style x:Key="HaloSlider" TargetType="Slider">
+    <Setter Property="IsMoveToPointEnabled" Value="True"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid VerticalAlignment="Center" Height="18" Background="Transparent">
+
+            <Border Height="6" CornerRadius="3"
+                    Background="{DynamicResource TrackBg}"
+                    VerticalAlignment="Center"/>
+
+            <Border x:Name="Filled" Height="6" CornerRadius="3"
+                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Background="{DynamicResource AccGradient}"/>
+
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="Slider.DecreaseLarge" Opacity="0" Focusable="False"/>
+              </Track.DecreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb x:Name="Thumb" Width="16" Height="16" Focusable="False">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Grid>
+                        <Ellipse Width="16" Height="16" Fill="White"
+                                 Stroke="{DynamicResource HairlineStrong}" StrokeThickness="1">
+                          <Ellipse.Effect>
+                            <DropShadowEffect Color="#141626" BlurRadius="8" ShadowDepth="1"
+                                              Direction="270" Opacity="0.18"/>
+                          </Ellipse.Effect>
+                        </Ellipse>
+                      </Grid>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="Slider.IncreaseLarge" Opacity="0" Focusable="False"/>
+              </Track.IncreaseRepeatButton>
+            </Track>
+          </Grid>
+
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Thumb" Property="Width" Value="18"/>
+              <Setter TargetName="Thumb" Property="Height" Value="18"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+</ResourceDictionary>

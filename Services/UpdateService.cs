@@ -45,9 +45,19 @@ namespace JL_Monitor_Brightness.Services
         {
             try
             {
+                // ⚠️ url приходит из update_info.json с сервера. При UseShellExecute
+                // оболочка выполнит не только https://, но и file://, путь к .exe и любую
+                // зарегистрированную схему — то есть чужой сервер получал бы запуск команды.
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                    (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+                {
+                    System.Diagnostics.Debug.WriteLine($"Отклонён небезопасный URL: {url}");
+                    return;
+                }
+
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = url,
+                    FileName = uri.AbsoluteUri,
                     UseShellExecute = true
                 };
                 System.Diagnostics.Process.Start(psi);

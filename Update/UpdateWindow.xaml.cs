@@ -60,8 +60,10 @@ namespace JL_Monitor_Brightness
         {
             if (DontRemindCheckBox.IsChecked == true)
             {
-                // Пользователь не хочет получать напоминание об этой версии
-                // Сохраняем последнюю проверенную версию
+                // ⚠️ Раньше здесь просто сдвигалась дата проверки — то есть галочка
+                // не делала того, что на ней написано: напоминание приходило через сутки.
+                // Запоминаем саму версию, чтобы про неё больше не спрашивать.
+                _settings.SkippedVersion = _updateInfo?.LatestVersion;
                 _settings.LastUpdateCheck = DateTime.Now;
                 _settings.SaveSettings();
             }

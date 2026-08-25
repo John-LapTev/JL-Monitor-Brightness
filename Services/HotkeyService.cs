@@ -55,15 +55,15 @@ namespace JL_Monitor_Brightness.Services
                 // Логируем ошибку, но не прерываем работу программы
                 System.Diagnostics.Debug.WriteLine($"Error registering hotkey {hotkeyId} ({GetKeyDescription(key, modifiers)}): {ex.Message}");
                 
-                // Попробуем добавить обработчик только для приложения (не глобально)
-                try
-                {
-                    MessageBox.Show($"Не удалось зарегистрировать горячую клавишу: {GetKeyDescription(key, modifiers)}\nВозможно, она уже используется другим приложением.",
-                        "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                catch { /* игнорируем ошибку, если не удается показать сообщение */ }
+                // Раньше здесь показывалось модальное окно прямо из сервиса — при
+                // автозапуске оно выскакивало на входе в систему, хотя программа
+                // должна молча уйти в трей. Теперь просто сообщаем наружу.
+                RegistrationFailed?.Invoke(this, GetKeyDescription(key, modifiers));
             }
         }
+
+        /// <summary>Комбинацию не удалось занять — обычно её держит другая программа.</summary>
+        public event EventHandler<string> RegistrationFailed;
 
         public void UnregisterHotkeys()
         {
@@ -83,6 +83,34 @@ namespace JL_Monitor_Brightness.Services
         {
             try
             {
+                // Key.None означает «очистить комбинацию». AddOrReplace с пустой клавишей
+                // бросает исключение, поэтому раньше очистка срабатывала лишь случайно —
+                // как побочный эффект внутреннего Remove в NHotkey.
+                if (key == Key.None)
+                {
+                    try { HotkeyManager.Current.Remove(hotkeyName); } catch { }
+
+                    switch (hotkeyName)
+                    {
+                        case BrightnessUpId:
+                            _brightnessUpKey = Key.None;
+                            _brightnessUpModifiers = ModifierKeys.None;
+                            break;
+                        case BrightnessDownId:
+                            _brightnessDownKey = Key.None;
+                            _brightnessDownModifiers = ModifierKeys.None;
+                            break;
+                        case BrightnessOverlayId:
+                            _brightnessOverlayKey = Key.None;
+                            _brightnessOverlayModifiers = ModifierKeys.None;
+                            break;
+                        default:
+                            return false;
+                    }
+
+                    return true;
+                }
+
                 switch (hotkeyName)
                 {
                     case BrightnessUpId:

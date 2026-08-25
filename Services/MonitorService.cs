@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace JL_Monitor_Brightness.Services
 {
-    public class MonitorService
+    public class MonitorService : IDisposable
     {
         // Win32 API для работы с физическими мониторами
         [DllImport("dxva2.dll", EntryPoint = "GetNumberOfPhysicalMonitorsFromHMONITOR")]
@@ -28,9 +28,6 @@ namespace JL_Monitor_Brightness.Services
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DestroyPhysicalMonitor(IntPtr hMonitor);
 
-        [DllImport("dxva2.dll", EntryPoint = "DestroyPhysicalMonitors")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DestroyPhysicalMonitors(uint dwPhysicalMonitorArraySize, [In] PHYSICAL_MONITOR[] pPhysicalMonitorArray);
 
         [DllImport("user32.dll")]
         private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
@@ -56,11 +53,44 @@ namespace JL_Monitor_Brightness.Services
 
         private List<PhysicalMonitorInfo> _monitors = new List<PhysicalMonitorInfo>();
 
+        // Встроенный экран живёт отдельно от DDC/CI, но в общем списке мониторов:
+        // человеку неважно, каким каналом крутится яркость.
+        private readonly LaptopBrightnessService _laptop = new LaptopBrightnessService();
+
         public List<PhysicalMonitorInfo> GetMonitors()
         {
-            _monitors.Clear();
+            // ⚠️ Именно ReleaseMonitors, а не Clear: хендлы от GetPhysicalMonitorsFromHMONITOR
+            // обязан освобождать вызывающий, иначе пул драйвера утекает при каждом обновлении.
+            ReleaseMonitors();
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorEnum, IntPtr.Zero);
-            return _monitors;
+
+            // Экран ноутбука первым: он всегда под рукой, а внешние приходят и уходят.
+            if (_laptop.IsAvailable)
+            {
+                int яркость = _laptop.GetBrightness();
+                if (яркость >= 0)
+                {
+                    _monitors.Insert(0, new PhysicalMonitorInfo
+                    {
+                        IsBuiltIn = true,
+                        Handle = IntPtr.Zero,
+                        Description = _laptop.Description,
+                        MinBrightness = 0,
+                        CurrentBrightness = (uint)яркость,
+                        MaxBrightness = 100,
+                        Index = 0,
+                    });
+
+                    // Индексы съехали из-за вставки в начало — пересчитываем.
+                    for (int i = 0; i < _monitors.Count; i++)
+                    {
+                        _monitors[i].Index = i;
+                    }
+                }
+            }
+            // Копия, а не внутренний список: иначе следующий вызов очистит список
+            // прямо под руками у того, кто держит ссылку.
+            return new List<PhysicalMonitorInfo>(_monitors);
         }
 
         private bool MonitorEnum(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData)
@@ -90,6 +120,13 @@ namespace JL_Monitor_Brightness.Services
                                 Index = _monitors.Count
                             });
                         }
+                        else
+                        {
+                            // Монитор без поддержки DDC/CI (обычно встроенная матрица ноутбука).
+                            // Хендл всё равно выделен — если его не отдать здесь, он утечёт
+                            // навсегда: в список он не попадает, и ReleaseMonitors его не увидит.
+                            DestroyPhysicalMonitor(monitor.hPhysicalMonitor);
+                        }
                     }
                 }
             }
@@ -101,6 +138,17 @@ namespace JL_Monitor_Brightness.Services
         {
             if (brightness < monitor.MinBrightness || brightness > monitor.MaxBrightness)
                 return false;
+
+            // У встроенного экрана нет хендла DDC/CI — только WMI.
+            if (monitor.IsBuiltIn)
+            {
+                bool ok = _laptop.SetBrightness((int)brightness);
+                if (ok)
+                {
+                    monitor.CurrentBrightness = brightness;
+                }
+                return ok;
+            }
 
             bool result = SetMonitorBrightness(monitor.Handle, brightness);
             if (result)
@@ -118,7 +166,10 @@ namespace JL_Monitor_Brightness.Services
 
         public bool DecreaseBrightness(PhysicalMonitorInfo monitor, uint decrement = 10)
         {
-            uint newBrightness = Math.Max(monitor.CurrentBrightness - decrement, monitor.MinBrightness);
+            // ⚠️ Без ограничения шага 5u - 10u даёт 4294967291 (uint не уходит в минус),
+            // Math.Max выбирает это значение, и яркость молча перестаёт убавляться.
+            uint step = Math.Min(decrement, monitor.CurrentBrightness);
+            uint newBrightness = Math.Max(monitor.CurrentBrightness - step, monitor.MinBrightness);
             return SetBrightness(monitor, newBrightness);
         }
 
@@ -126,21 +177,47 @@ namespace JL_Monitor_Brightness.Services
         {
             foreach (var monitor in _monitors)
             {
-                DestroyPhysicalMonitor(monitor.Handle);
+                // У встроенного экрана хендла нет — освобождать нечего.
+                if (!monitor.IsBuiltIn && monitor.Handle != IntPtr.Zero)
+                {
+                    DestroyPhysicalMonitor(monitor.Handle);
+                }
             }
             _monitors.Clear();
+        }
+
+        public void Dispose()
+        {
+            ReleaseMonitors();
+            GC.SuppressFinalize(this);
+        }
+
+        ~MonitorService()
+        {
+            // Страховка: если Dispose забыли, хендлы всё равно вернутся драйверу.
+            ReleaseMonitors();
         }
     }
 
     public class PhysicalMonitorInfo
     {
+        /// <summary>
+        /// Встроенный экран ноутбука. У него нет хендла DDC/CI — яркость идёт
+        /// через WMI, поэтому все операции проверяют этот признак.
+        /// </summary>
+        public bool IsBuiltIn { get; set; }
+
         public IntPtr Handle { get; set; }
         public string Description { get; set; }
         public uint MinBrightness { get; set; }
         public uint CurrentBrightness { get; set; }
         public uint MaxBrightness { get; set; }
         public int Index { get; set; }
-        public int BrightnessPercentage => (int)((CurrentBrightness - MinBrightness) * 100 / (MaxBrightness - MinBrightness));
+        // ⚠️ Виртуальные дисплеи и часть KVM отвечают Min == Max. Без проверки это
+        // DivideByZeroException прямо в обработчике горячей клавиши, то есть падение программы.
+        public int BrightnessPercentage => MaxBrightness > MinBrightness
+            ? (int)((CurrentBrightness - MinBrightness) * 100 / (MaxBrightness - MinBrightness))
+            : 0;
 
         public override string ToString()
         {

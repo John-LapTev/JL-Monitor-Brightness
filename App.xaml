@@ -3,8 +3,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:JL_Monitor_Brightness"
              Startup="Application_Startup"
-             Exit="Application_Exit">
+             Exit="Application_Exit"
+             ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Tokens.xaml"/>
+                <ResourceDictionary Source="Themes/Effects.xaml"/>
+                <ResourceDictionary Source="Themes/Icons.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.Slider.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.Basic.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.Complex.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

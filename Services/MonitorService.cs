@@ -53,12 +53,41 @@ namespace JL_Monitor_Brightness.Services
 
         private List<PhysicalMonitorInfo> _monitors = new List<PhysicalMonitorInfo>();
 
+        // Встроенный экран живёт отдельно от DDC/CI, но в общем списке мониторов:
+        // человеку неважно, каким каналом крутится яркость.
+        private readonly LaptopBrightnessService _laptop = new LaptopBrightnessService();
+
         public List<PhysicalMonitorInfo> GetMonitors()
         {
             // ⚠️ Именно ReleaseMonitors, а не Clear: хендлы от GetPhysicalMonitorsFromHMONITOR
             // обязан освобождать вызывающий, иначе пул драйвера утекает при каждом обновлении.
             ReleaseMonitors();
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorEnum, IntPtr.Zero);
+
+            // Экран ноутбука первым: он всегда под рукой, а внешние приходят и уходят.
+            if (_laptop.IsAvailable)
+            {
+                int яркость = _laptop.GetBrightness();
+                if (яркость >= 0)
+                {
+                    _monitors.Insert(0, new PhysicalMonitorInfo
+                    {
+                        IsBuiltIn = true,
+                        Handle = IntPtr.Zero,
+                        Description = _laptop.Description,
+                        MinBrightness = 0,
+                        CurrentBrightness = (uint)яркость,
+                        MaxBrightness = 100,
+                        Index = 0,
+                    });
+
+                    // Индексы съехали из-за вставки в начало — пересчитываем.
+                    for (int i = 0; i < _monitors.Count; i++)
+                    {
+                        _monitors[i].Index = i;
+                    }
+                }
+            }
             // Копия, а не внутренний список: иначе следующий вызов очистит список
             // прямо под руками у того, кто держит ссылку.
             return new List<PhysicalMonitorInfo>(_monitors);
@@ -110,6 +139,17 @@ namespace JL_Monitor_Brightness.Services
             if (brightness < monitor.MinBrightness || brightness > monitor.MaxBrightness)
                 return false;
 
+            // У встроенного экрана нет хендла DDC/CI — только WMI.
+            if (monitor.IsBuiltIn)
+            {
+                bool ok = _laptop.SetBrightness((int)brightness);
+                if (ok)
+                {
+                    monitor.CurrentBrightness = brightness;
+                }
+                return ok;
+            }
+
             bool result = SetMonitorBrightness(monitor.Handle, brightness);
             if (result)
             {
@@ -137,7 +177,11 @@ namespace JL_Monitor_Brightness.Services
         {
             foreach (var monitor in _monitors)
             {
-                DestroyPhysicalMonitor(monitor.Handle);
+                // У встроенного экрана хендла нет — освобождать нечего.
+                if (!monitor.IsBuiltIn && monitor.Handle != IntPtr.Zero)
+                {
+                    DestroyPhysicalMonitor(monitor.Handle);
+                }
             }
             _monitors.Clear();
         }
@@ -157,6 +201,12 @@ namespace JL_Monitor_Brightness.Services
 
     public class PhysicalMonitorInfo
     {
+        /// <summary>
+        /// Встроенный экран ноутбука. У него нет хендла DDC/CI — яркость идёт
+        /// через WMI, поэтому все операции проверяют этот признак.
+        /// </summary>
+        public bool IsBuiltIn { get; set; }
+
         public IntPtr Handle { get; set; }
         public string Description { get; set; }
         public uint MinBrightness { get; set; }

@@ -36,8 +36,15 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
   ValueType: none; ValueName: "JL-Monitor-Brightness"; Flags: uninsdeletevalue
 
 [Files]
-Source: "bin\Release\net8.0-windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "bin\Release\net8.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Путь задаётся снаружи (-DSourceDir), по умолчанию — обычная папка публикации.
+; ⚠️ Раньше здесь стоял bin\Release: сборка кладёт файлы в publish\setup,
+; и установщик не находил ни одного файла.
+#ifndef SourceDir
+  #define SourceDir "publish\setup"
+#endif
+
+Source: "{#SourceDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

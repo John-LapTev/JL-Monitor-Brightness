@@ -117,8 +117,11 @@ dotnet publish -c Release -r win-x64 --self-contained false ^
 **Установщик** (нужен [Inno Setup 6](https://jrsoftware.org/isdl.php)):
 
 ```bash
+dotnet publish -c Release -r win-x64 --self-contained false -o publish/setup
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" JL-Monitor-Brightness.iss
 ```
+
+⚠️ Сначала публикация, потом установщик: он берёт файлы из `publish/setup`.
 
 Готовые сборки собираются автоматически через GitHub Actions при создании тега `v*`.
 
